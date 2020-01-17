@@ -1,10 +1,9 @@
 import 'dart:typed_data';
 
 import 'source.dart';
-import 'type_registry.dart';
 
 class BytesWriter extends BinaryWriter {
-  BytesWriter(TypeRegistry registry) : super(registry);
+  BytesWriter();
 
   int offset = 0;
 
@@ -50,7 +49,7 @@ class BytesWriter extends BinaryWriter {
 }
 
 class BytesReader extends BinaryReader {
-  BytesReader(List<int> data, TypeRegistry registry) : super(registry) {
+  BytesReader(List<int> data) {
     _data = ByteData.view(Uint8List.fromList(data).buffer);
   }
 
@@ -104,11 +103,5 @@ class BytesReader extends BinaryReader {
   double readFloat64() => _data.getFloat64(_advance(8));
 }
 
-Uint8List serialize(dynamic object) {
-  final writer = BytesWriter(defaultTypeRegistry)..write(object);
-  return writer.data;
-}
-
-dynamic deserialize(Uint8List data) {
-  return BytesReader(data, defaultTypeRegistry).read();
-}
+Uint8List serialize(dynamic object) => (BytesWriter()..write(object)).data;
+dynamic deserialize(Uint8List data) => BytesReader(data).read();

@@ -6,18 +6,41 @@ import 'type_node.dart';
 
 void debugPrint(Object object) => print(object);
 
-class TypeRegistry {
+/// The [TypeRegistry] holds references to all [TypeAdapter]s used in the app
+/// to serialize and deserialize data.
+///
+/// It allows getting an adapter by id, getting the id of an adapter, as well
+/// as finding an adapter for a specific object.
+final TypeRegistry = _TypeRegistryImpl._()..registerAdapters(builtInAdapters);
+
+class _TypeRegistryImpl {
+  _TypeRegistryImpl._();
+
+  // For greater efficiency, there are several data structures that hold
+  // references to adapters. These allow us to:
+  // - Get the id of an adapter in O(1).
+  // - Get an adapter for an id in O(1).
+  // - If the static type of an object equals its runtime type, getting the
+  //   correct adapter for that object in O(1).
+  // - If the static type of an object differs from its runtime type, getting
+  //   the correct adapter somewhere between O(log n) and O(n), depending on
+  //   the class hierarchy.
   final _idsByAdapters = <TypeAdapter<dynamic>, int>{};
   final _adaptersById = <int, TypeAdapter<dynamic>>{};
   final _adaptersByExactType = <Type, TypeAdapter<dynamic>>{};
-  final _typeTree = TypeNode<Object>.virtual();
+  final _typeTree = TypeNode<Object>.virtual()
+    ..addSubtype(TypeNode<Iterable>.virtual());
 
   // If an exact type can't be encoded, we suggest adding an adapter. Here, we
-  // save which adapters we suggested along with the suggested id.
+  // keep track of which adapters we suggested along with the suggested id.
   final _suggestedAdapters = <String, int>{};
 
-  /// Register a [TypeAdapter] to announce it.
+  /// Register a [TypeAdapter] to make it available for serializing and
+  /// deserializing.
   void registerAdapter<T>(int typeId, TypeAdapter<T> adapter) {
+    assert(typeId != null);
+    assert(adapter != null);
+
     if (_idsByAdapters[adapter] == typeId) {
       debugPrint('You tried to register adapter $adapter, but its already '
           'registered under that id ($typeId).');
@@ -44,47 +67,60 @@ class TypeRegistry {
     _typeTree.insert(TypeNode<T>(adapter));
   }
 
-  void registerAdapters(Map<int, TypeAdapter<dynamic>> adapters) {
-    adapters.forEach(
-        (typeId, adapter) => adapter.registerWithId(typeId, registry: this));
+  /// Register multiple adapters.
+  void registerAdapters(Map<int, TypeAdapter<dynamic>> adaptersById) {
+    // We don't directly call [registerAdapter], but rather let the adapter
+    // call that method, because otherwise we would lose type information.
+    adaptersById.forEach((typeId, adapter) => adapter.registerForId(typeId));
   }
 
-  TypeAdapter findAdapterByValue<T>(T value) {
-    final adapterForExactType = _adaptersByExactType[value.runtimeType];
+  /// Finds the id of an adapter.
+  int findIdOfAdapter(TypeAdapter<dynamic> adapter) => _idsByAdapters[adapter];
+
+  /// Finds the adapter registered for the given [typeId].
+  TypeAdapter findAdapterById(int typeId) => _adaptersById[typeId];
+
+  /// Finds an adapter for serializing the [object].
+  TypeAdapter findAdapterByValue<T>(T object) {
+    // First, try to find an adapter by the exact type in O(1).
+    final adapterForExactType = _adaptersByExactType[object.runtimeType];
     if (adapterForExactType != null) {
       return adapterForExactType;
     }
 
-    final bestMatchingAdapter = _typeTree.findAdapterByValue(value);
-    final actualType = value.runtimeType.toString();
+    // Otherwise, find the best matching adapter in the type tree.
+    final bestMatchingAdapter = _typeTree.findAdapterByValue(object);
+    final actualType = object.runtimeType.toString();
     final matchingType = bestMatchingAdapter.type.toString();
 
-    if (actualType.replaceAll('JSArray', 'List') != matchingType &&
-            !actualType.startsWith('_') ||
-        matchingType.contains('dynamic')) {
-      // Suggest adding an exact adapter.
-      final suggestedId = _suggestedAdapters[actualType] ??
-          _adaptersById.keys.reduce(max) + 1 + _suggestedAdapters.length;
-      _suggestedAdapters[actualType] = suggestedId;
+    if (bestMatchingAdapter == null) {
+      throw Exception('No adapter for the type $actualType found. Consider '
+          'adding an adapter for that type by calling '
+          '${_createAdapterSuggestion(actualType)}.');
+    }
 
-      if (bestMatchingAdapter == null) {
-        throw Exception('No adapter for the type $actualType found. Consider '
-            'adding an adapter for that type by calling '
-            'AdapterFor$actualType().registerWithId($suggestedId).');
-      }
-
+    if (_isSameType(actualType, matchingType)) {
       debugPrint('No adapter for the exact type $actualType found, so we\'re '
           'encoding it as a $matchingType. For better performance and truly '
           'type-safe serializing, consider adding an adapter for that type by '
-          'calling AdapterFor$actualType().registerWithId($suggestedId).');
+          'calling ${_createAdapterSuggestion(actualType)}.');
     }
 
     return bestMatchingAdapter;
   }
 
-  int findIdOfAdapter(TypeAdapter<dynamic> adapter) => _idsByAdapters[adapter];
+  static bool _isSameType(String runtimeTypeString, String staticTypeString) {
+    return runtimeTypeString
+            .replaceAll('JSArray', 'List')
+            .replaceAll('_CompactHashSet', 'Set') ==
+        staticTypeString;
+  }
 
-  TypeAdapter findAdapterById(int typeId) => _adaptersById[typeId];
+  String _createAdapterSuggestion(String typeString) {
+    final suggestedId = _suggestedAdapters[typeString] ??
+        _adaptersById.keys.reduce(max) + 1 + _suggestedAdapters.length;
+    _suggestedAdapters[typeString] = suggestedId;
+
+    return 'AdapterFor$typeString().registerForId($suggestedId)';
+  }
 }
-
-final defaultTypeRegistry = TypeRegistry()..registerAdapters(builtInAdapters);

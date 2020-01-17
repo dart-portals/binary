@@ -3,11 +3,9 @@ import 'dart:typed_data';
 import 'adapters/adapters.dart';
 import 'type_registry.dart';
 
-/// The [BinaryWriter] is used to encode data to the binary format.
+/// The [BinaryWriter] is used to encode classes to binary data.
 abstract class BinaryWriter {
-  const BinaryWriter(this.registry);
-
-  final TypeRegistry registry;
+  const BinaryWriter();
 
   // Methods to override.
   void writeUint8(int value);
@@ -22,23 +20,20 @@ abstract class BinaryWriter {
   void writeFloat64(double value);
 
   /// Finds a fitting adapter for the given [value] and then writes it.
-  /// If an adapter is provided, the search for an adapter starts there.
   void write<T>(T value) {
-    final adapter = registry.findAdapterByValue<T>(value);
+    final adapter = TypeRegistry.findAdapterByValue<T>(value);
     if (adapter == null) {
       throw Exception(
           'No adapter found for value $value of type ${value.runtimeType}.');
     }
-    writeTypeId(registry.findIdOfAdapter(adapter));
+    writeTypeId(TypeRegistry.findIdOfAdapter(adapter));
     adapter.write(this, value);
   }
 }
 
-/// The [BinaryReader] is used to bring data back from the binary format.
+/// The [BinaryReader] is used to bring objects back from the binary data.
 abstract class BinaryReader {
-  const BinaryReader(this.registry);
-
-  final TypeRegistry registry;
+  const BinaryReader();
 
   /// The number of bytes left in this entry.
   int get availableBytes;
@@ -61,10 +56,11 @@ abstract class BinaryReader {
   double readFloat32();
   double readFloat64();
 
-  /// Reads a type id and chooses the correct adapter for that. Read using the given adapter.
+  /// Reads a type id and chooses the correct adapter for that. Read using the
+  /// given adapter.
   T read<T>() {
     final typeId = readTypeId();
-    final adapter = registry.findAdapterById(typeId);
+    final adapter = TypeRegistry.findAdapterById(typeId);
     return adapter.read(this);
   }
 }
