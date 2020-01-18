@@ -9,9 +9,6 @@ part 'custom.dart';
 part 'typed_data.dart';
 
 final builtInAdapters = <int, TypeAdapter<dynamic>>{
-  // dart:typed_data adapters.
-  -3: AdapterForUint8List(),
-
   // dart:core adapters.
   -18: AdapterForNull(),
   -4: AdapterForBool(),
@@ -28,4 +25,7 @@ final builtInAdapters = <int, TypeAdapter<dynamic>>{
   -15: AdapterForRegExp(),
   -16: AdapterForRunes(),
   -17: AdapterForStackTrace(),
+
+  // dart:typed_data adapters.
+  -3: AdapterForUint8List(),
 };

@@ -6,8 +6,8 @@ import 'type_node.dart';
 
 void debugPrint(Object object) => print(object);
 
-/// The [TypeRegistry] holds references to all [TypeAdapter]s used in the app
-/// to serialize and deserialize data.
+/// The [TypeRegistry] holds references to all [TypeAdapter]s used to serialize
+/// and deserialize data.
 ///
 /// It allows getting an adapter by id, getting the id of an adapter, as well
 /// as finding an adapter for a specific object.
