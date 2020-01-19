@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'dart:math';
 
+import 'package:meta/meta.dart';
+
 import 'adapters/adapters.dart';
-import 'type_adapter.dart';
+import 'source.dart';
 import 'type_node.dart';
+
+part 'type_adapter.dart';
 
 void debugPrint(Object object) => print(object);
 
@@ -15,6 +20,8 @@ final TypeRegistry = _TypeRegistryImpl._()..registerAdapters(builtInAdapters);
 
 class _TypeRegistryImpl {
   _TypeRegistryImpl._();
+
+  void thenDo(void Function() callback) => scheduleMicrotask(callback);
 
   // For greater efficiency, there are several data structures that hold
   // references to adapters. These allow us to:
@@ -71,7 +78,9 @@ class _TypeRegistryImpl {
   void registerAdapters(Map<int, TypeAdapter<dynamic>> adaptersById) {
     // We don't directly call [registerAdapter], but rather let the adapter
     // call that method, because otherwise we would lose type information.
-    adaptersById.forEach((typeId, adapter) => adapter.registerForId(typeId));
+    adaptersById.forEach((typeId, adapter) {
+      adapter._registerForId(typeId, this);
+    });
   }
 
   /// Finds the id of an adapter.

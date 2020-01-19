@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../source.dart';
-import '../type_adapter.dart';
+import '../type_registry.dart';
 
 part 'core.dart';
 part 'custom.dart';

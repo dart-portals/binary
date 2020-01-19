@@ -1,4 +1,4 @@
-import 'type_adapter.dart';
+import 'type_registry.dart';
 
 /// Adapters are saved in a tree of [TypeNode]s for efficient lookup.
 ///

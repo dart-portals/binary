@@ -1,7 +1,4 @@
-import 'package:meta/meta.dart';
-
-import 'source.dart';
-import 'type_registry.dart';
+part of 'type_registry.dart';
 
 typedef Writer<T> = void Function(BinaryWriter writer, T obj);
 typedef Reader<T> = T Function(BinaryReader reader);
@@ -20,6 +17,9 @@ abstract class TypeAdapter<T> {
   T read(BinaryReader reader);
 
   /// Registers this adapter for the given [typeId].
-  void registerForId(int typeId) =>
-      TypeRegistry.registerAdapter<T>(typeId, this);
+  void registerForId(int typeId) => _registerForId(typeId, TypeRegistry);
+
+  /// Registers this adapter for the given [typeId] on the given [registry].
+  void _registerForId(int typeId, _TypeRegistryImpl registry) =>
+      registry.registerAdapter<T>(typeId, this);
 }
