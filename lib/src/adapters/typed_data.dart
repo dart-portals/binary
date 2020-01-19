@@ -17,6 +17,8 @@ extension TypedDataReader on BinaryReader {
 }
 
 class AdapterForUint8List extends TypeAdapter<Uint8List> {
+  const AdapterForUint8List();
+
   @override
   Uint8List read(BinaryReader reader) =>
       Uint8List.fromList(reader.readByteList());

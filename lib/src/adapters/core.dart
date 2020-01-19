@@ -1,6 +1,6 @@
 part of 'adapters.dart';
 
-// Adapters for types of the dart:core library.
+// Adapters for types of the dart:core library minus collection types.
 
 extension PrimitiveTypesWriter on BinaryWriter {
   void writeBool(bool value) => writeUint8(value ? 1 : 0);
@@ -95,67 +95,6 @@ class AdapterForDuration extends TypeAdapter<Duration> {
       Duration(microseconds: reader.readInt());
 }
 
-class AdapterForList<T> extends TypeAdapter<List<T>> {
-  const AdapterForList();
-
-  @override
-  void write(BinaryWriter writer, List<T> list) {
-    writer.writeLength(list.length);
-    list.forEach(writer.write);
-  }
-
-  @override
-  List<T> read(BinaryReader reader) {
-    final length = reader.readLength();
-    return <T>[
-      for (var i = 0; i < length; i++) reader.read<T>(),
-    ];
-  }
-}
-
-class AdapterForSet<T> extends TypeAdapter<Set<T>> {
-  const AdapterForSet();
-
-  @override
-  void write(BinaryWriter writer, Set<T> theSet) =>
-      const AdapterForList().write(writer, theSet.toList());
-
-  @override
-  Set<T> read(BinaryReader reader) => AdapterForList<T>().read(reader).toSet();
-}
-
-class AdapterForMapEntry<K, V> extends TypeAdapter<MapEntry<K, V>> {
-  const AdapterForMapEntry();
-
-  @override
-  void write(BinaryWriter writer, MapEntry<K, V> entry) {
-    writer..write(entry.key)..write(entry.value);
-  }
-
-  @override
-  MapEntry<K, V> read(BinaryReader reader) {
-    return MapEntry(reader.read<K>(), reader.read<V>());
-  }
-}
-
-class AdapterForMap<K, V> extends TypeAdapter<Map<K, V>> {
-  const AdapterForMap();
-
-  @override
-  void write(BinaryWriter writer, Map<K, V> map) {
-    writer.writeLength(map.length);
-    map.entries.forEach((entry) => const AdapterForMapEntry().write);
-  }
-
-  @override
-  Map<K, V> read(BinaryReader reader) {
-    final length = reader.readLength();
-    return Map<K, V>.fromEntries({
-      for (var i = 0; i < length; i++) const AdapterForMapEntry().read(reader),
-    });
-  }
-}
-
 class AdapterForRegExp extends TypeAdapter<RegExp> {
   const AdapterForRegExp();
 
@@ -182,6 +121,8 @@ class AdapterForRegExp extends TypeAdapter<RegExp> {
 }
 
 class AdapterForRunes extends TypeAdapter<Runes> {
+  const AdapterForRunes();
+
   @override
   void write(BinaryWriter writer, Runes runes) =>
       writer.writeString(runes.string);
@@ -191,6 +132,8 @@ class AdapterForRunes extends TypeAdapter<Runes> {
 }
 
 class AdapterForStackTrace extends TypeAdapter<StackTrace> {
+  const AdapterForStackTrace();
+
   @override
   void write(BinaryWriter writer, StackTrace stackTrace) =>
       writer.writeString(stackTrace.toString());
