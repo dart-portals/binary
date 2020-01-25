@@ -11,6 +11,16 @@ part 'type_adapter.dart';
 
 void debugPrint(Object object) => print(object);
 
+class LegacyTypeUsed implements Exception {
+  LegacyTypeUsed(this.id, this.adapter);
+
+  final int id;
+  final TypeAdapter<dynamic> adapter;
+
+  String toString() => 'The id $id is marked as legacy and should not be used '
+      'anymore. However, the adapter $adapter registered for that id.';
+}
+
 /// The [TypeRegistry] holds references to all [TypeAdapter]s used to serialize
 /// and deserialize data.
 ///
@@ -38,6 +48,12 @@ class _TypeRegistryImpl {
   final _typeTree = TypeNode<Object>.virtual()
     ..addSubtype(TypeNode<Iterable>.virtual());
 
+  // Users may register adapters for types in one version of their app and
+  // later remove types and the corresponding adapters. To ensure
+  // interoperability between encodings created at different versions of the
+  // app, ids should not be reused at some later time.
+  final _legacyIds = <int>{};
+
   // If an exact type can't be encoded, we suggest adding an adapter. Here, we
   // keep track of which adapters we suggested along with the suggested id.
   final _suggestedAdapters = <String, int>{};
@@ -47,6 +63,10 @@ class _TypeRegistryImpl {
   void registerAdapter<T>(int typeId, TypeAdapter<T> adapter) {
     assert(typeId != null);
     assert(adapter != null);
+
+    if (_legacyIds.contains(typeId)) {
+      throw LegacyTypeUsed(typeId, adapter);
+    }
 
     if (_idsByAdapters[adapter] == typeId) {
       debugPrint('You tried to register adapter $adapter, but its already '
@@ -77,10 +97,21 @@ class _TypeRegistryImpl {
   /// Register multiple adapters.
   void registerAdapters(Map<int, TypeAdapter<dynamic>> adaptersById) {
     // We don't directly call [registerAdapter], but rather let the adapter
-    // call that method, because otherwise we would lose type information.
+    // call that method, because otherwise we would lose type information (the
+    // static type of the adapters inside the map is `TypeAdapter<dynamic>`).
     adaptersById.forEach((typeId, adapter) {
       adapter._registerForId(typeId, this);
     });
+  }
+
+  /// Make sure the [typeIds] are not being used anymore.
+  void registerLegacyTypes(Set<int> typeIds) {
+    _legacyIds.addAll(typeIds);
+
+    final usedIds = typeIds.intersection(_adaptersById.keys.toSet());
+    if (usedIds.isNotEmpty) {
+      throw LegacyTypeUsed(usedIds.first, _adaptersById[usedIds.first]);
+    }
   }
 
   /// Finds the id of an adapter.
@@ -98,38 +129,39 @@ class _TypeRegistryImpl {
     }
 
     // Otherwise, find the best matching adapter in the type tree.
-    final bestMatchingAdapter = _typeTree.findAdapterByValue(object);
-    final actualType = object.runtimeType.toString();
-    final matchingType = bestMatchingAdapter.type.toString();
+    final matchingNode = _typeTree.findNodeByValue(object);
+    final matchingType = matchingNode.type;
+    final actualType = object.runtimeType;
 
-    if (bestMatchingAdapter == null) {
+    if (matchingNode.adapter == null) {
       throw Exception('No adapter for the type $actualType found. Consider '
           'adding an adapter for that type by calling '
           '${_createAdapterSuggestion(actualType)}.');
     }
 
-    if (_isSameType(actualType, matchingType)) {
+    if (!_isSameType(actualType, matchingType)) {
       debugPrint('No adapter for the exact type $actualType found, so we\'re '
-          'encoding it as a $matchingType. For better performance and truly '
+          'encoding it as a $matchingNode. For better performance and truly '
           'type-safe serializing, consider adding an adapter for that type by '
           'calling ${_createAdapterSuggestion(actualType)}.');
     }
 
-    return bestMatchingAdapter;
+    return matchingNode.adapter;
   }
 
-  static bool _isSameType(String runtimeTypeString, String staticTypeString) {
-    return runtimeTypeString
+  static bool _isSameType(Type runtimeType, Type staticType) {
+    return staticType.toString() ==
+        runtimeType
+            .toString()
             .replaceAll('JSArray', 'List')
-            .replaceAll('_CompactHashSet', 'Set') ==
-        staticTypeString;
+            .replaceAll('_CompactLinkedHashSet', 'Set');
   }
 
-  String _createAdapterSuggestion(String typeString) {
-    final suggestedId = _suggestedAdapters[typeString] ??
+  String _createAdapterSuggestion(Type type) {
+    final suggestedId = _suggestedAdapters[type.toString()] ??
         _adaptersById.keys.reduce(max) + 1 + _suggestedAdapters.length;
-    _suggestedAdapters[typeString] = suggestedId;
+    _suggestedAdapters[type.toString()] = suggestedId;
 
-    return 'AdapterFor$typeString().registerForId($suggestedId)';
+    return 'AdapterFor$type().registerForId($suggestedId)';
   }
 }
