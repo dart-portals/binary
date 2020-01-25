@@ -27,6 +27,8 @@ class TypeNode<T> {
   final TypeAdapter<T> adapter;
   final _subtypes = <TypeNode<T>>{};
 
+  Type get type => T;
+
   bool matches(dynamic value) => value is T;
   bool isSupertypeOf(TypeNode<dynamic> type) => type is TypeNode<T>;
 
@@ -51,9 +53,9 @@ class TypeNode<T> {
     }
   }
 
-  TypeAdapter<T> findAdapterByValue(T value) {
+  TypeNode<T> findNodeByValue(T value) {
     final matchingSubtype =
         _subtypes.firstWhere((type) => type.matches(value), orElse: () => null);
-    return matchingSubtype?.findAdapterByValue(value) ?? adapter;
+    return matchingSubtype?.findNodeByValue(value) ?? this;
   }
 }
