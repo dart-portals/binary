@@ -59,8 +59,6 @@ abstract class BinaryReader {
   /// Reads a type id and chooses the correct adapter for that. Read using the
   /// given adapter.
   T read<T>() {
-    final typeId = readTypeId();
-    final adapter = TypeRegistry.findAdapterById(typeId);
-    return adapter.read(this);
+    return TypeRegistry.findAdapterById(readTypeId()).read(this);
   }
 }
