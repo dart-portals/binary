@@ -3,7 +3,8 @@ import 'package:meta/meta.dart';
 /// Can be used as an annotate on a class to mark that a [TypeAdapter] should
 /// get generated for it.
 class BinaryType {
-  const BinaryType({@required this.legacyFields});
+  const BinaryType({this.legacyFields = const {}})
+      : assert(legacyFields != null);
 
   /// Field ids that were used in the past and should not be used anymore.
   final Set<int> legacyFields;
