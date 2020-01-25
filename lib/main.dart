@@ -44,11 +44,17 @@ class AdapterForMyClass<T> extends TypeAdapter<MyClass<T>> {
 }
 
 void main() {
-  AdapterForMyClass<int>().registerForId(0);
-  AdapterForList<int>().registerForId(1);
-  AdapterForSet<int>().registerForId(2);
+  TypeRegistry
+    ..registerLegacyTypes({1})
+    ..registerAdapters({
+      0: AdapterForMyClass<int>(),
+    });
 
-  final data = serialize(MyClass(id: 'some-id', someNumbers: {1, 2, 3}));
+  final data = serialize(MyClass(
+    id: 'hey',
+    someNumbers: {1, 2},
+  ));
   print('Serialized to $data');
   print(deserialize(data));
+  print(data.map((byte) => byte.toRadixString(16)).join(' '));
 }
