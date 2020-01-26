@@ -49,7 +49,7 @@ void main() {
 
   final data = binary.serialize(MyClass(
     id: 'hey',
-    someNumbers: {1, 2},
+    someNumbers: {1, 2, null},
   ));
   print('Serialized to $data');
   print(binary.deserialize(data));

@@ -6,15 +6,26 @@ extension PrimitiveTypesWriter on BinaryWriter {
   void writeBool(bool value) => writeUint8(value ? 1 : 0);
   void writeDouble(double value) => writeFloat64(value);
   void writeInt(int value) => writeDouble(value.toDouble());
-  void writeString(String value) =>
-      writeByteList(Uint8List.fromList(utf8.encode(value)));
+
+  void writeString(String value) {
+    final bytes = utf8.encode(value);
+    writeUint32(bytes.length);
+    bytes.forEach(writeUint8);
+  }
 }
 
 extension PrimitiveTypesReader on BinaryReader {
   bool readBool() => readUint8() != 0;
   double readDouble() => readFloat64();
   int readInt() => readDouble().toInt();
-  String readString() => utf8.decode(readByteList());
+
+  String readString() {
+    final length = readUint32();
+    final bytes = <int>[
+      for (int i = 0; i < length; i++) readUint8(),
+    ];
+    return utf8.decode(bytes);
+  }
 }
 
 class AdapterForNull extends TypeAdapter<Null> {
@@ -43,8 +54,15 @@ class AdapterForInt extends TypeAdapter<int> {
 
 class AdapterForString extends TypeAdapter<String> {
   const AdapterForString();
-  void write(BinaryWriter writer, String value) => writer.writeString(value);
-  String read(BinaryReader reader) => reader.readString();
+  void write(BinaryWriter writer, String value) {
+    utf8.encode(value).forEach(writer.writeUint8);
+  }
+
+  String read(BinaryReader reader) {
+    return utf8.decode(<int>[
+      for (; reader.hasAvailableBytes;) reader.readUint8(),
+    ]);
+  }
 }
 
 class AdapterForBigInt extends TypeAdapter<BigInt> {
