@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import '../source.dart';
+import '../binary.dart';
 import '../type_registry.dart';
 
 part 'core.dart';

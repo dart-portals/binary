@@ -5,15 +5,13 @@ class AdapterForList<T> extends TypeAdapter<List<T>> {
 
   @override
   void write(BinaryWriter writer, List<T> list) {
-    writer.writeLength(list.length);
     list.forEach(writer.write);
   }
 
   @override
   List<T> read(BinaryReader reader) {
-    final length = reader.readLength();
     return <T>[
-      for (var i = 0; i < length; i++) reader.read<T>(),
+      for (; reader.hasAvailableBytes;) reader.read<T>(),
     ];
   }
 }
@@ -25,7 +23,6 @@ class AdapterForPrimitiveList<T> extends TypeAdapter<List<T>> {
 
   @override
   void write(BinaryWriter writer, List<T> list) {
-    writer.writeLength(list.length);
     for (final item in list) {
       adapter.write(writer, item);
     }
@@ -33,9 +30,8 @@ class AdapterForPrimitiveList<T> extends TypeAdapter<List<T>> {
 
   @override
   List<T> read(BinaryReader reader) {
-    final length = reader.readLength();
     return <T>[
-      for (var i = 0; i < length; i++) adapter.read(reader),
+      for (; reader.hasAvailableBytes;) adapter.read(reader),
     ];
   }
 }
@@ -70,15 +66,13 @@ class AdapterForMap<K, V> extends TypeAdapter<Map<K, V>> {
 
   @override
   void write(BinaryWriter writer, Map<K, V> map) {
-    writer.writeLength(map.length);
     map.entries.forEach((entry) => const AdapterForMapEntry().write);
   }
 
   @override
   Map<K, V> read(BinaryReader reader) {
-    final length = reader.readLength();
     return Map<K, V>.fromEntries({
-      for (var i = 0; i < length; i++) const AdapterForMapEntry().read(reader),
+      for (; reader.hasAvailableBytes;) const AdapterForMapEntry().read(reader),
     });
   }
 }
@@ -91,7 +85,6 @@ class AdapterForMapWithPrimitiveKey<K, V> extends TypeAdapter<Map<K, V>> {
 
   @override
   void write(BinaryWriter writer, Map<K, V> map) {
-    writer.writeLength(map.length);
     map.forEach((key, value) {
       keyAdapter.write(writer, key);
       writer.write(value);
@@ -100,9 +93,8 @@ class AdapterForMapWithPrimitiveKey<K, V> extends TypeAdapter<Map<K, V>> {
 
   @override
   Map<K, V> read(BinaryReader reader) {
-    final length = reader.readLength();
     return <K, V>{
-      for (var i = 0; i < length; i++)
+      for (; reader.hasAvailableBytes;)
         keyAdapter.read(reader): reader.read<V>(),
     };
   }

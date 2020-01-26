@@ -6,27 +6,15 @@ extension PrimitiveTypesWriter on BinaryWriter {
   void writeBool(bool value) => writeUint8(value ? 1 : 0);
   void writeDouble(double value) => writeFloat64(value);
   void writeInt(int value) => writeDouble(value.toDouble());
-
   void writeString(String value) =>
       writeByteList(Uint8List.fromList(utf8.encode(value)));
-  void writeAsciiString(String value) {
-    assert(value.codeUnits.every((codeUnit) => (codeUnit & ~0x7f) != 0),
-        'String contains non-ASCII chars.');
-    writeByteList(value.codeUnits);
-  }
-
-  void writeLength(int length) => writeUint32(length);
 }
 
 extension PrimitiveTypesReader on BinaryReader {
   bool readBool() => readUint8() != 0;
   double readDouble() => readFloat64();
   int readInt() => readDouble().toInt();
-
   String readString() => utf8.decode(readByteList());
-  String readAsciiString() => String.fromCharCodes(readByteList());
-
-  int readLength() => readUint32();
 }
 
 class AdapterForNull extends TypeAdapter<Null> {

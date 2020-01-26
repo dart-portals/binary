@@ -5,10 +5,16 @@ It's inspired by Protobuf.
 
 There are three typical use cases for this package.
 
-* Clients that use the Binary serializer to be able to **serialize custom classes** create `TypeAdapter`s for them and register them at the `TypeRegistry`.
-* Clients trying to **read and write serialized binary data** create a `BinaryReader` and a `BinaryWriter` by implementing some low-level methods like `writeUint8`, `writeUint16`.
-* Clients that actively want to **serialize and deserialize data** can accept any `BinaryReader` and `BinaryWriter` and call `read`/`write` on them to serialize and deserialize arbitrary objects.  
-There's a higher-level `serialize`/`deserialize` API for converting to/from `Uint8List`.
+To make custom classes serializable, create `TypeAdapter`s for them and register them at the `TypeRegistry`.
+`TypeAdapter`s should be able to serialize and deserialize data given a `BinaryWriter` or `BinaryReader`.
+
+To actually serialize and deserialize objects, just call `binary.serialize(…)` or `binary.deserialize(…)`.
+
+### Features
+
+* Can encode any class, including generic classes. Classes need to be registered before though.
+* Serialization is safe. No single adapter can corrupt the binary format. Misbehaving adapters will be called out during runtime, making the serialization process easily debuggable.
+* Future- and backwards-compatible. Unknown types will just be decoded to null.
 
 ### Behind the scenes: How is data encoded
 

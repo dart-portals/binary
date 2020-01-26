@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:meta/meta.dart';
 
 import 'adapters/adapters.dart';
-import 'source.dart';
+import 'binary.dart';
 import 'type_node.dart';
 
 part 'type_adapter.dart';

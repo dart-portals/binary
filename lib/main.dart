@@ -21,7 +21,6 @@ class AdapterForMyClass<T> extends TypeAdapter<MyClass<T>> {
   @override
   void write(BinaryWriter writer, MyClass<T> obj) {
     writer
-      ..writeNumberOfFields(2)
       ..writeFieldId(0)
       ..write(obj.id)
       ..writeFieldId(1)
@@ -30,10 +29,8 @@ class AdapterForMyClass<T> extends TypeAdapter<MyClass<T>> {
 
   @override
   MyClass<T> read(BinaryReader reader) {
-    final numberOfFields = reader.readNumberOfFields();
     final fields = <int, dynamic>{
-      for (var i = 0; i < numberOfFields; i++)
-        reader.readFieldId(): reader.read(),
+      for (; reader.hasAvailableBytes;) reader.readFieldId(): reader.read(),
     };
 
     return MyClass<T>(
@@ -50,11 +47,11 @@ void main() {
       0: AdapterForMyClass<int>(),
     });
 
-  final data = serialize(MyClass(
+  final data = binary.serialize(MyClass(
     id: 'hey',
     someNumbers: {1, 2},
   ));
   print('Serialized to $data');
-  print(deserialize(data));
+  print(binary.deserialize(data));
   print(data.map((byte) => byte.toRadixString(16)).join(' '));
 }
