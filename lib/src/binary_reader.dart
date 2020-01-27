@@ -27,24 +27,25 @@ class BinaryReader {
   /// Finds a fitting adapter for the given [value] and then writes it.
   T read<T>() {
     final typeId = readUint16() - _reservedTypeIds;
-    final length = readUint32();
-
-    _addLimit(length);
-
     final adapter = TypeRegistry.findAdapterById(typeId);
+
     if (adapter == null) {
+      final length = readUint32();
       skip(length);
       return null;
+    } else if (adapter is UnsafeTypeAdapter) {
+      final data = adapter.read(this);
+      return data;
+    } else {
+      final length = readUint32();
+      _addLimit(length);
+      final data = adapter.read(this);
+      if (hasAvailableBytes) {
+        throw Exception('Adapter did not read everything that it wrote.');
+      }
+      _removeLimit();
+      return data;
     }
-
-    final data = adapter.read(this);
-    if (hasAvailableBytes) {
-      throw Exception('Adapter did not read everything that it wrote.');
-    }
-
-    _removeLimit();
-
-    return data;
   }
 
   int get availableBytes => _currentLimit - _limitingData._offset;

@@ -28,44 +28,37 @@ extension PrimitiveTypesReader on BinaryReader {
   }
 }
 
-class AdapterForNull extends TypeAdapter<Null> {
+class AdapterForNull extends UnsafeTypeAdapter<Null> {
   const AdapterForNull();
   void write(_, __) {}
   Null read(_) => null;
 }
 
-class AdapterForBool extends TypeAdapter<bool> {
+class AdapterForBool extends UnsafeTypeAdapter<bool> {
   const AdapterForBool();
   void write(BinaryWriter writer, bool value) => writer.writeBool(value);
   bool read(BinaryReader reader) => reader.readBool();
 }
 
-class AdapterForDouble extends TypeAdapter<double> {
+class AdapterForDouble extends UnsafeTypeAdapter<double> {
   const AdapterForDouble();
   void write(BinaryWriter writer, double value) => writer.writeDouble(value);
   double read(BinaryReader reader) => reader.readDouble();
 }
 
-class AdapterForInt extends TypeAdapter<int> {
+class AdapterForInt extends UnsafeTypeAdapter<int> {
   const AdapterForInt();
   void write(BinaryWriter writer, int value) => writer.writeInt(value);
   int read(BinaryReader reader) => reader.readInt();
 }
 
-class AdapterForString extends TypeAdapter<String> {
+class AdapterForString extends UnsafeTypeAdapter<String> {
   const AdapterForString();
-  void write(BinaryWriter writer, String value) {
-    utf8.encode(value).forEach(writer.writeUint8);
-  }
-
-  String read(BinaryReader reader) {
-    return utf8.decode(<int>[
-      for (; reader.hasAvailableBytes;) reader.readUint8(),
-    ]);
-  }
+  void write(BinaryWriter writer, String value) => writer.writeString(value);
+  String read(BinaryReader reader) => reader.readString();
 }
 
-class AdapterForBigInt extends TypeAdapter<BigInt> {
+class AdapterForBigInt extends UnsafeTypeAdapter<BigInt> {
   const AdapterForBigInt();
 
   @override
@@ -77,7 +70,7 @@ class AdapterForBigInt extends TypeAdapter<BigInt> {
       BigInt.parse(reader.readString(), radix: 36);
 }
 
-class AdapterForDateTime extends TypeAdapter<DateTime> {
+class AdapterForDateTime extends UnsafeTypeAdapter<DateTime> {
   const AdapterForDateTime();
 
   @override
@@ -89,7 +82,7 @@ class AdapterForDateTime extends TypeAdapter<DateTime> {
       DateTime.fromMicrosecondsSinceEpoch(reader.readInt());
 }
 
-class AdapterForDuration extends TypeAdapter<Duration> {
+class AdapterForDuration extends UnsafeTypeAdapter<Duration> {
   const AdapterForDuration();
 
   @override
@@ -126,7 +119,7 @@ class AdapterForRegExp extends TypeAdapter<RegExp> {
   }
 }
 
-class AdapterForRunes extends TypeAdapter<Runes> {
+class AdapterForRunes extends UnsafeTypeAdapter<Runes> {
   const AdapterForRunes();
 
   @override
@@ -137,7 +130,7 @@ class AdapterForRunes extends TypeAdapter<Runes> {
   Runes read(BinaryReader reader) => reader.readString().runes;
 }
 
-class AdapterForStackTrace extends TypeAdapter<StackTrace> {
+class AdapterForStackTrace extends UnsafeTypeAdapter<StackTrace> {
   const AdapterForStackTrace();
 
   @override

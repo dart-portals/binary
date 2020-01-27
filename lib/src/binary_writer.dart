@@ -37,15 +37,23 @@ class BinaryWriter {
     // type id | content length | content
     // 2 bytes | 4 bytes        | n bytes
 
+    // Note: The above does not apply to some primitive adapters which extend
+    // [UnsafeTypeAdapter]. They exist purely for efficiency reason.
+
     writeUint16(typeId + _reservedTypeIds);
-    _reserve(4); // Reserve bytes for the length.
-    final start = _offset;
 
-    adapter.write(this, value);
+    if (adapter is UnsafeTypeAdapter) {
+      adapter.write(this, value);
+    } else {
+      _reserve(4); // Reserve bytes for the length.
+      final start = _offset;
 
-    final end = _offset;
-    final length = end - start;
-    _data.setUint32(start - 4, length);
+      adapter.write(this, value);
+
+      final end = _offset;
+      final length = end - start;
+      _data.setUint32(start - 4, length);
+    }
   }
 
   void writeUint8(int value) => _data.setUint8(_reserve(1), value);

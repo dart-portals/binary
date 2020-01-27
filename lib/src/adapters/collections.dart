@@ -2,40 +2,47 @@ part of 'adapters.dart';
 
 /// Adapter for a list of arbitrary elements. Because these elements may have
 /// subclasses, the type has to be encoded for every element.
-class AdapterForList<T> extends TypeAdapter<List<T>> {
+class AdapterForList<T> extends UnsafeTypeAdapter<List<T>> {
   const AdapterForList();
 
   @override
   void write(BinaryWriter writer, List<T> list) {
+    writer.writeUint32(list.length);
     list.forEach(writer.write);
   }
 
   @override
   List<T> read(BinaryReader reader) {
+    final length = reader.readUint32();
     return <T>[
-      for (; reader.hasAvailableBytes;) reader.read<T>(),
+      for (var i = 0; i < length; i++) reader.read<T>(),
     ];
   }
 }
 
 /// Adapter for a list of [bool]s. Obviously, they can be encoded quite
 /// efficiently. Because the list may contain [null], the elements are encoded
-/// as two bytes with 00 for [null], 01 for [true] and 10 for [false].
-class AdapterForListOfBool extends TypeAdapter<List<bool>> {
+/// as two bytes with 11 for [null], 01 for [true], 10 for [false] and 00 as a
+/// terminating sequence.
+class AdapterForListOfBool extends UnsafeTypeAdapter<List<bool>> {
   const AdapterForListOfBool();
 
-  _boolToBits(bool value) => value == null ? 0 : value ? 1 : 2;
-  _bitsToBool(int bits) => bits == 0 ? null : bits == 1;
+  _boolToBits(bool value) => value == null ? 3 : value ? 1 : 2;
+  _bitsToBool(int bits) => bits == 3 ? null : bits == 1;
 
   @override
   void write(BinaryWriter writer, List<bool> list) {
-    writer.writeUint32(list.length);
-
     for (var i = 0; i < list.length; i += 4) {
       var byte = 0;
-      for (var j = 0; j < 4; i++) {
-        byte |= _boolToBits(i + j < list.length ? list[i + j] : null) << 2;
-        byte << 2;
+      for (var j = 0; j < 4; j++) {
+        final index = i + j;
+        if (index < list.length) {
+          byte <<= 2;
+          byte |= _boolToBits(i + j < list.length ? list[i + j] : null);
+        } else {
+          byte <<= 2;
+          // 00 bits encode the end of the sequence.
+        }
       }
       writer.writeUint8(byte);
     }
@@ -43,20 +50,23 @@ class AdapterForListOfBool extends TypeAdapter<List<bool>> {
 
   @override
   List<bool> read(BinaryReader reader) {
-    final length = reader.readUint32();
     final list = <bool>[];
 
-    var i = 0;
-    while (i < length) {
-      final byte = reader.readUint8();
-      list.add(_bitsToBool(byte & (128 + 64)));
-      i++;
-      if (i < length) list.add(_bitsToBool(byte & (32 + 16)));
-      i++;
-      if (i < length) list.add(_bitsToBool(byte & (8 + 4)));
-      i++;
-      if (i < length) list.add(_bitsToBool(byte & (2 + 1)));
-    }
+    int byte, bits;
+    do {
+      byte = reader.readUint8();
+      print(byte.toRadixString(2));
+
+      for (var j = 0; j < 4; j++) {
+        // Read the two left bits.
+        bits = (byte & (128 + 64)) >> 6;
+        byte <<= 2;
+        if (bits == 0) {
+          break;
+        }
+        list.add(_bitsToBool(bits));
+      }
+    } while (bits != 0);
 
     return list;
   }
@@ -67,10 +77,10 @@ class AdapterForListOfBool extends TypeAdapter<List<bool>> {
 /// exact right type, so we can encode them directly. They may be [null]
 /// though, so a bit field at the beginning encodes the null-ness of the
 /// elements (as well as the length of the list).
-class AdapterForPrimitiveList<T> extends TypeAdapter<List<T>> {
+class AdapterForPrimitiveList<T> extends UnsafeTypeAdapter<List<T>> {
   const AdapterForPrimitiveList(this.adapter) : assert(adapter != null);
 
-  final TypeAdapter<T> adapter;
+  final UnsafeTypeAdapter<T> adapter;
 
   @override
   void write(BinaryWriter writer, List<T> list) {
@@ -98,7 +108,7 @@ class AdapterForPrimitiveList<T> extends TypeAdapter<List<T>> {
 
 /// Because elements of type [Null] can only have the value [null], encoding
 /// the length of the list is sufficient to reconstruct it.
-class AdapterForListOfNull extends TypeAdapter<List<Null>> {
+class AdapterForListOfNull extends UnsafeTypeAdapter<List<Null>> {
   const AdapterForListOfNull();
 
   @override
@@ -118,7 +128,7 @@ class AdapterForListOfNull extends TypeAdapter<List<Null>> {
 
 /// Adapter that encodes a [Set<T>] by just delegating the responsibility to an
 /// [AdapterForList<T>].
-class AdapterForSet<T> extends TypeAdapter<Set<T>> {
+class AdapterForSet<T> extends UnsafeTypeAdapter<Set<T>> {
   const AdapterForSet();
 
   @override
@@ -139,7 +149,7 @@ class AdapterForSet<T> extends TypeAdapter<Set<T>> {
 class AdapterForPrimitiveSet<T> extends TypeAdapter<Set<T>> {
   const AdapterForPrimitiveSet(this.adapter) : assert(adapter != null);
 
-  final TypeAdapter<T> adapter;
+  final UnsafeTypeAdapter<T> adapter;
 
   @override
   void write(BinaryWriter writer, Set<T> theSet) {
@@ -160,7 +170,7 @@ class AdapterForPrimitiveSet<T> extends TypeAdapter<Set<T>> {
   }
 }
 
-class AdapterForMapEntry<K, V> extends TypeAdapter<MapEntry<K, V>> {
+class AdapterForMapEntry<K, V> extends UnsafeTypeAdapter<MapEntry<K, V>> {
   const AdapterForMapEntry();
 
   @override
@@ -174,30 +184,33 @@ class AdapterForMapEntry<K, V> extends TypeAdapter<MapEntry<K, V>> {
   }
 }
 
-class AdapterForMap<K, V> extends TypeAdapter<Map<K, V>> {
+class AdapterForMap<K, V> extends UnsafeTypeAdapter<Map<K, V>> {
   const AdapterForMap();
 
   @override
   void write(BinaryWriter writer, Map<K, V> map) {
+    writer.writeUint32(map.length);
     map.entries.forEach((entry) => const AdapterForMapEntry().write);
   }
 
   @override
   Map<K, V> read(BinaryReader reader) {
+    final length = reader.readUint32();
     return Map<K, V>.fromEntries({
-      for (; reader.hasAvailableBytes;) const AdapterForMapEntry().read(reader),
+      for (var i = 0; i < length; i++) const AdapterForMapEntry().read(reader),
     });
   }
 }
 
-class AdapterForMapWithPrimitiveKey<K, V> extends TypeAdapter<Map<K, V>> {
+class AdapterForMapWithPrimitiveKey<K, V> extends UnsafeTypeAdapter<Map<K, V>> {
   const AdapterForMapWithPrimitiveKey(this.keyAdapter)
       : assert(keyAdapter != null);
 
-  final TypeAdapter<K> keyAdapter;
+  final UnsafeTypeAdapter<K> keyAdapter;
 
   @override
   void write(BinaryWriter writer, Map<K, V> map) {
+    writer.write(map.length);
     map.forEach((key, value) {
       keyAdapter.write(writer, key);
       writer.write(value);
@@ -206,8 +219,9 @@ class AdapterForMapWithPrimitiveKey<K, V> extends TypeAdapter<Map<K, V>> {
 
   @override
   Map<K, V> read(BinaryReader reader) {
+    final length = reader.readUint32();
     return <K, V>{
-      for (; reader.hasAvailableBytes;)
+      for (var i = 0; i < length; i++)
         keyAdapter.read(reader): reader.read<V>(),
     };
   }

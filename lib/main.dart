@@ -4,7 +4,11 @@ import 'binary.dart';
 
 @BinaryType(legacyFields: {2})
 class MyClass<T> {
-  MyClass({@required this.id, @required this.someNumbers});
+  MyClass({
+    @required this.id,
+    @required this.someNumbers,
+    @required this.booleans,
+  });
 
   @BinaryField(0)
   final String id;
@@ -12,7 +16,10 @@ class MyClass<T> {
   @BinaryField(1)
   final Set<T> someNumbers;
 
-  String toString() => 'MyClass($id, $someNumbers)';
+  @BinaryField(2)
+  final List<bool> booleans;
+
+  String toString() => 'MyClass($id, $someNumbers, $booleans)';
 }
 
 class AdapterForMyClass<T> extends TypeAdapter<MyClass<T>> {
@@ -24,7 +31,9 @@ class AdapterForMyClass<T> extends TypeAdapter<MyClass<T>> {
       ..writeFieldId(0)
       ..write(obj.id)
       ..writeFieldId(1)
-      ..write(obj.someNumbers);
+      ..write(obj.someNumbers)
+      ..writeFieldId(2)
+      ..write(obj.booleans);
   }
 
   @override
@@ -36,6 +45,7 @@ class AdapterForMyClass<T> extends TypeAdapter<MyClass<T>> {
     return MyClass<T>(
       id: fields[0],
       someNumbers: fields[1],
+      booleans: fields[2],
     );
   }
 }
@@ -50,6 +60,7 @@ void main() {
   final data = binary.serialize(MyClass(
     id: 'hey',
     someNumbers: {1, 2, null},
+    booleans: [true, true, null, true, false, true, false, true, true],
   ));
   print('Serialized to $data');
   print(binary.deserialize(data));

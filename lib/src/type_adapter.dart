@@ -37,3 +37,16 @@ abstract class TypeAdapter<T> {
     return runtimeType == other.runtimeType;
   }
 }
+
+/// [UnsafeTypeAdapter]s allow for more efficiency by not saving the length of
+/// the serialized data in the binary format.
+/// That means these adapters cannot have faulty behavior – otherwise they may
+/// corrupt some of the binary format around them. Adapters that extend this
+/// class also always have to be registered – trying to deserialize a binary
+/// format that contains such a type without the adapter being registered makes
+/// the binary format being considered corrupted.
+/// Additionaly, [UnsafeTypeAdapter]s may not call
+/// [BinaryReader.availableBytes] or [BinaryReader.hasAvailableBytes].
+abstract class UnsafeTypeAdapter<T> extends TypeAdapter<T> {
+  const UnsafeTypeAdapter();
+}
