@@ -66,6 +66,8 @@ class BinaryWriter {
   void writeInt64(int value) => _data.setInt64(_reserve(8), value);
   void writeFloat32(double value) => _data.setFloat32(_reserve(4), value);
   void writeFloat64(double value) => _data.setFloat64(_reserve(8), value);
+
+  void debugDump() => print(_dataAsUint8List);
 }
 
 class _ResizingByteData {

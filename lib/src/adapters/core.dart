@@ -5,26 +5,32 @@ part of 'adapters.dart';
 extension PrimitiveTypesWriter on BinaryWriter {
   void writeBool(bool value) => writeUint8(value ? 1 : 0);
   void writeDouble(double value) => writeFloat64(value);
-  void writeInt(int value) => writeDouble(value.toDouble());
+  void writeInt(int value) => writeInt64(value);
 
   void writeString(String value) {
+    // Because utf8 bytes cannot be 0, we can encode null-terminated strings.
     final bytes = utf8.encode(value);
-    writeUint32(bytes.length);
     bytes.forEach(writeUint8);
+    writeUint8(0);
   }
 }
 
 extension PrimitiveTypesReader on BinaryReader {
   bool readBool() => readUint8() != 0;
   double readDouble() => readFloat64();
-  int readInt() => readDouble().toInt();
+  int readInt() => readInt64();
 
   String readString() {
-    final length = readUint32();
-    final bytes = <int>[
-      for (int i = 0; i < length; i++) readUint8(),
-    ];
-    return utf8.decode(bytes);
+    final bytes = <int>[];
+    while (true) {
+      final byte = readUint8();
+
+      if (byte == 0) {
+        return utf8.decode(bytes);
+      } else {
+        bytes.add(byte);
+      }
+    }
   }
 }
 

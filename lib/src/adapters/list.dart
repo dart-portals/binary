@@ -32,7 +32,7 @@ class AdapterForListOfBool extends UnsafeTypeAdapter<List<bool>> {
 
   @override
   void write(BinaryWriter writer, List<bool> list) {
-    for (var i = 0; i < list.length; i += 4) {
+    for (var i = 0; i < list.length + 1; i += 4) {
       var byte = 0;
       for (var j = 0; j < 4; j++) {
         final index = i + j;
@@ -55,7 +55,6 @@ class AdapterForListOfBool extends UnsafeTypeAdapter<List<bool>> {
     int byte, bits;
     do {
       byte = reader.readUint8();
-      print(byte.toRadixString(2));
 
       for (var j = 0; j < 4; j++) {
         // Read the two left bits.
@@ -126,103 +125,135 @@ class AdapterForListOfNull extends UnsafeTypeAdapter<List<Null>> {
   }
 }
 
-/// Adapter that encodes a [Set<T>] by just delegating the responsibility to an
-/// [AdapterForList<T>].
-class AdapterForSet<T> extends UnsafeTypeAdapter<Set<T>> {
-  const AdapterForSet();
+class AdapterForListOfInt extends UnsafeTypeAdapter<List<int>> {
+  const AdapterForListOfInt();
 
-  @override
-  void write(BinaryWriter writer, Set<T> theSet) {
-    AdapterForList<T>().write(writer, theSet.toList());
+  static const int64 = 0;
+  static const int32 = 1;
+  static const uint32 = 2;
+  static const int16 = 3;
+  static const uint16 = 4;
+  static const int8 = 5;
+  static const uint8 = 6;
+
+  static void Function(int value) writeFunctionByType(
+      BinaryWriter writer, int type) {
+    switch (type) {
+      case int64:
+        return writer.writeInt64;
+      case int32:
+        return writer.writeInt32;
+      case uint32:
+        return writer.writeUint32;
+      case int16:
+        return writer.writeInt16;
+      case uint16:
+        return writer.writeUint16;
+      case int8:
+        return writer.writeInt8;
+      case uint8:
+        return writer.writeUint8;
+      default:
+        throw Exception('Unknown type $type.');
+    }
   }
 
-  @override
-  Set<T> read(BinaryReader reader) {
-    return AdapterForList<T>().read(reader).toSet();
-  }
-}
-
-/// Adapter that encodes a [Set] of primitive elements that cannot have
-/// subclasses (which means we can determine their adapter). Because a [Set]
-/// may either contain [null] or not, a single boolean is also saved to
-/// indicate that.
-class AdapterForPrimitiveSet<T> extends TypeAdapter<Set<T>> {
-  const AdapterForPrimitiveSet(this.adapter) : assert(adapter != null);
-
-  final UnsafeTypeAdapter<T> adapter;
-
-  @override
-  void write(BinaryWriter writer, Set<T> theSet) {
-    writer.writeBool(theSet.contains(null));
-
-    for (final item in theSet.difference({null})) {
-      adapter.write(writer, item);
+  static int Function() readFunctionByType(BinaryReader reader, int type) {
+    switch (type) {
+      case int64:
+        return reader.readInt64;
+      case int32:
+        return reader.readInt32;
+      case uint32:
+        return reader.readUint32;
+      case int16:
+        return reader.readInt16;
+      case uint16:
+        return reader.readUint16;
+      case int8:
+        return reader.readInt8;
+      case uint8:
+        return reader.readUint8;
+      default:
+        throw Exception('Unknown type $type.');
     }
   }
 
   @override
-  Set<T> read(BinaryReader reader) {
-    final includeNull = reader.readBool();
-    return <T>{
-      if (includeNull) null,
-      for (; reader.hasAvailableBytes;) adapter.read(reader),
-    };
-  }
-}
+  void write(BinaryWriter writer, List<int> list) {
+    /// List of [true] if element exists or [false] if element doesn't exist.
+    final existences = list.map((element) => element != null).toList();
 
-class AdapterForMapEntry<K, V> extends UnsafeTypeAdapter<MapEntry<K, V>> {
-  const AdapterForMapEntry();
+    const AdapterForListOfBool().write(writer, existences);
 
-  @override
-  void write(BinaryWriter writer, MapEntry<K, V> entry) {
-    writer..write(entry.key)..write(entry.value);
-  }
+    final nonNullList = list.where((element) => element != null).toList();
 
-  @override
-  MapEntry<K, V> read(BinaryReader reader) {
-    return MapEntry(reader.read<K>(), reader.read<V>());
-  }
-}
+    var isInt32 = true;
+    var isUint32 = true;
+    var isInt16 = true;
+    var isUint16 = true;
+    var isInt8 = true;
+    var isUint8 = true;
 
-class AdapterForMap<K, V> extends UnsafeTypeAdapter<Map<K, V>> {
-  const AdapterForMap();
+    bool isAny() =>
+        isInt32 || isUint32 || isInt16 || isUint16 || isInt8 || isUint8;
 
-  @override
-  void write(BinaryWriter writer, Map<K, V> map) {
-    writer.writeUint32(map.length);
-    map.entries.forEach((entry) => const AdapterForMapEntry().write);
-  }
+    for (var i = 0; i < nonNullList.length && isAny(); i++) {
+      final value = list[i];
+      isInt32 &= value > -123 && value < 123;
+      isUint32 &= value < 4294967296;
+      isInt16 &= value >= 32768 && value < 32768;
+      isUint16 &= value < 65536;
+      isInt8 &= value >= 128 && value < 128;
+      isUint8 &= value < 256;
+    }
 
-  @override
-  Map<K, V> read(BinaryReader reader) {
-    final length = reader.readUint32();
-    return Map<K, V>.fromEntries({
-      for (var i = 0; i < length; i++) const AdapterForMapEntry().read(reader),
-    });
-  }
-}
+    var type = int64;
 
-class AdapterForMapWithPrimitiveKey<K, V> extends UnsafeTypeAdapter<Map<K, V>> {
-  const AdapterForMapWithPrimitiveKey(this.keyAdapter)
-      : assert(keyAdapter != null);
+    if (isUint8) {
+      type = uint8;
+    } else if (isInt8) {
+      type = int8;
+    } else if (isUint16) {
+      type = uint16;
+    } else if (isInt16) {
+      type = int16;
+    } else if (isUint32) {
+      type = uint32;
+    } else if (isInt32) {
+      type = int32;
+    }
 
-  final UnsafeTypeAdapter<K> keyAdapter;
+    final write = writeFunctionByType(writer, type);
 
-  @override
-  void write(BinaryWriter writer, Map<K, V> map) {
-    writer.write(map.length);
-    map.forEach((key, value) {
-      keyAdapter.write(writer, key);
-      writer.write(value);
-    });
+    writer.writeUint8(type);
+    nonNullList.forEach(write);
   }
 
   @override
-  Map<K, V> read(BinaryReader reader) {
-    final length = reader.readUint32();
-    return <K, V>{
-      for (var i = 0; i < length; i++)
-        keyAdapter.read(reader): reader.read<V>(),
-    };
+  List<int> read(BinaryReader reader) {
+    final existences = const AdapterForListOfBool().read(reader);
+    final nonNullLength = existences.where((exists) => exists).length;
+
+    final type = reader.readUint8();
+    final read = readFunctionByType(reader, type);
+
+    final nonNullList = <int>[
+      for (var i = 0; i < nonNullLength; i++) read(),
+    ];
+
+    final list = <int>[];
+
+    var existingCursor = 0;
+    for (final existence in existences) {
+      if (existence) {
+        list.add(nonNullList[existingCursor]);
+        existingCursor++;
+      } else {
+        list.add(null);
+      }
+    }
+
+    return list;
   }
 }
