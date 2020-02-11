@@ -2,8 +2,8 @@ part of 'adapters.dart';
 
 /// Adapter for a list of arbitrary elements. Because these elements may have
 /// subclasses, the type has to be encoded for every element.
-class AdapterForList<T> extends UnsafeTypeAdapter<List<T>> {
-  const AdapterForList();
+class AdapterForList<T> extends AdapterFor<List<T>> {
+  const AdapterForList() : super.primitive();
 
   @override
   void write(BinaryWriter writer, List<T> list) {
@@ -24,8 +24,8 @@ class AdapterForList<T> extends UnsafeTypeAdapter<List<T>> {
 /// efficiently. Because the list may contain [null], the elements are encoded
 /// as two bytes with 11 for [null], 01 for [true], 10 for [false] and 00 as a
 /// terminating sequence.
-class AdapterForListOfBool extends UnsafeTypeAdapter<List<bool>> {
-  const AdapterForListOfBool();
+class AdapterForListOfBool extends AdapterFor<List<bool>> {
+  const AdapterForListOfBool() : super.primitive();
 
   _boolToBits(bool value) => value == null ? 3 : value ? 1 : 2;
   _bitsToBool(int bits) => bits == 3 ? null : bits == 1;
@@ -71,49 +71,14 @@ class AdapterForListOfBool extends UnsafeTypeAdapter<List<bool>> {
   }
 }
 
-/// An adapter for a list of a primitive type that can have no subclasses (like
-/// [int], [double], [String] etc). We are sure that the elements are of the
-/// exact right type, so we can encode them directly. They may be [null]
-/// though, so a bit field at the beginning encodes the null-ness of the
-/// elements (as well as the length of the list).
-class AdapterForPrimitiveList<T> extends UnsafeTypeAdapter<List<T>> {
-  const AdapterForPrimitiveList(this.adapter) : assert(adapter != null);
-
-  final UnsafeTypeAdapter<T> adapter;
-
-  @override
-  void write(BinaryWriter writer, List<T> list) {
-    /// List of [true] if element exists or [false] if element doesn't exist.
-    final existences = list.map((element) => element != null).toList();
-
-    const AdapterForListOfBool().write(writer, existences);
-
-    // Write the remaining non-null items.
-    for (final item in list.where((element) => element != null)) {
-      adapter.write(writer, item);
-    }
-  }
-
-  @override
-  List<T> read(BinaryReader reader) {
-    final existences = const AdapterForListOfBool().read(reader);
-
-    return <T>[
-      for (var i = 0; i < existences.length; i++)
-        if (existences[i]) adapter.read(reader) else null,
-    ];
-  }
-}
-
 /// Because elements of type [Null] can only have the value [null], encoding
 /// the length of the list is sufficient to reconstruct it.
-class AdapterForListOfNull extends UnsafeTypeAdapter<List<Null>> {
-  const AdapterForListOfNull();
+class AdapterForListOfNull extends AdapterFor<List<Null>> {
+  const AdapterForListOfNull() : super.primitive();
 
   @override
-  void write(BinaryWriter writer, List<Null> list) {
-    writer.writeUint32(list.length);
-  }
+  void write(BinaryWriter writer, List<Null> list) =>
+      writer.writeUint32(list.length);
 
   @override
   List<Null> read(BinaryReader reader) {
@@ -125,135 +90,74 @@ class AdapterForListOfNull extends UnsafeTypeAdapter<List<Null>> {
   }
 }
 
-class AdapterForListOfInt extends UnsafeTypeAdapter<List<int>> {
-  const AdapterForListOfInt();
+/// An adapter for a list of a primitive type that can have no subclasses (like
+/// [int], [double], [String] etc). We are sure that the elements are of the
+/// exact right type, so we can encode them directly. They may be [null]
+/// though, so a bit field at the beginning encodes the null-ness of the
+/// elements (as well as the length of the list).
+class AdapterForPrimitiveList<T>
+    extends AdapterForSpecificValueOfType<List<T>> {
+  const AdapterForPrimitiveList._({
+    @required this.isShort,
+    @required this.isNullable,
+    @required this.adapter,
+  })  : assert(adapter != null),
+        super.primitive();
 
-  static const int64 = 0;
-  static const int32 = 1;
-  static const uint32 = 2;
-  static const int16 = 3;
-  static const uint16 = 4;
-  static const int8 = 5;
-  static const uint8 = 6;
+  const AdapterForPrimitiveList.short(AdapterFor<T> adapter)
+      : this._(adapter: adapter, isNullable: false, isShort: true);
 
-  static void Function(int value) writeFunctionByType(
-      BinaryWriter writer, int type) {
-    switch (type) {
-      case int64:
-        return writer.writeInt64;
-      case int32:
-        return writer.writeInt32;
-      case uint32:
-        return writer.writeUint32;
-      case int16:
-        return writer.writeInt16;
-      case uint16:
-        return writer.writeUint16;
-      case int8:
-        return writer.writeInt8;
-      case uint8:
-        return writer.writeUint8;
-      default:
-        throw Exception('Unknown type $type.');
-    }
+  const AdapterForPrimitiveList.long(AdapterFor<T> adapter)
+      : this._(adapter: adapter, isNullable: false, isShort: false);
+
+  const AdapterForPrimitiveList.nullable(AdapterFor<T> adapter)
+      : this._(adapter: adapter, isNullable: true, isShort: false);
+
+  final bool isShort;
+  final bool isNullable;
+  final AdapterFor<T> adapter;
+
+  @override
+  bool matches(List<T> list) {
+    if (isShort && list.length >= 256) return false;
+    if (!isNullable && list.any((item) => item == null)) return false;
+    if (adapter is! AdapterForSpecificValueOfType) return false;
+    final valueAdapter = adapter as AdapterForSpecificValueOfType<T>;
+    return list.where((item) => item != null).every(valueAdapter.matches);
   }
 
-  static int Function() readFunctionByType(BinaryReader reader, int type) {
-    switch (type) {
-      case int64:
-        return reader.readInt64;
-      case int32:
-        return reader.readInt32;
-      case uint32:
-        return reader.readUint32;
-      case int16:
-        return reader.readInt16;
-      case uint16:
-        return reader.readUint16;
-      case int8:
-        return reader.readInt8;
-      case uint8:
-        return reader.readUint8;
-      default:
-        throw Exception('Unknown type $type.');
+  @override
+  void write(BinaryWriter writer, List<T> list) {
+    if (isNullable) {
+      /// List of [true] if element exists or [false] if element doesn't exist.
+      const AdapterForListOfBool()
+          .write(writer, list.map((element) => element != null).toList());
+    } else {
+      (isShort ? writer.writeUint8 : writer.writeUint32)(list.length);
+    }
+
+    // Write the remaining non-null items.
+    for (final item in list.where((element) => element != null)) {
+      adapter.write(writer, item);
     }
   }
 
   @override
-  void write(BinaryWriter writer, List<int> list) {
-    /// List of [true] if element exists or [false] if element doesn't exist.
-    final existences = list.map((element) => element != null).toList();
+  List<T> read(BinaryReader reader) {
+    int length;
+    List<bool> existences;
 
-    const AdapterForListOfBool().write(writer, existences);
-
-    final nonNullList = list.where((element) => element != null).toList();
-
-    var isInt32 = true;
-    var isUint32 = true;
-    var isInt16 = true;
-    var isUint16 = true;
-    var isInt8 = true;
-    var isUint8 = true;
-
-    bool isAny() =>
-        isInt32 || isUint32 || isInt16 || isUint16 || isInt8 || isUint8;
-
-    for (var i = 0; i < nonNullList.length && isAny(); i++) {
-      final value = list[i];
-      isInt32 &= value > -123 && value < 123;
-      isUint32 &= value < 4294967296;
-      isInt16 &= value >= 32768 && value < 32768;
-      isUint16 &= value < 65536;
-      isInt8 &= value >= 128 && value < 128;
-      isUint8 &= value < 256;
+    if (isNullable) {
+      existences = const AdapterForListOfBool().read(reader);
+      length = existences.length;
+    } else {
+      length = isShort ? reader.readUint8() : reader.readUint32();
+      existences = <bool>[for (var i = 0; i < length; i++) true];
     }
 
-    var type = int64;
-
-    if (isUint8) {
-      type = uint8;
-    } else if (isInt8) {
-      type = int8;
-    } else if (isUint16) {
-      type = uint16;
-    } else if (isInt16) {
-      type = int16;
-    } else if (isUint32) {
-      type = uint32;
-    } else if (isInt32) {
-      type = int32;
-    }
-
-    final write = writeFunctionByType(writer, type);
-
-    writer.writeUint8(type);
-    nonNullList.forEach(write);
-  }
-
-  @override
-  List<int> read(BinaryReader reader) {
-    final existences = const AdapterForListOfBool().read(reader);
-    final nonNullLength = existences.where((exists) => exists).length;
-
-    final type = reader.readUint8();
-    final read = readFunctionByType(reader, type);
-
-    final nonNullList = <int>[
-      for (var i = 0; i < nonNullLength; i++) read(),
+    return <T>[
+      for (var i = 0; i < existences.length; i++)
+        if (existences[i]) adapter.read(reader) else null,
     ];
-
-    final list = <int>[];
-
-    var existingCursor = 0;
-    for (final existence in existences) {
-      if (existence) {
-        list.add(nonNullList[existingCursor]);
-        existingCursor++;
-      } else {
-        list.add(null);
-      }
-    }
-
-    return list;
   }
 }

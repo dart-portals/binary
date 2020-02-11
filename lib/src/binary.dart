@@ -7,7 +7,7 @@ part 'binary_writer.dart';
 
 const binary = _Api();
 
-const _reservedTypeIds = 2048;
+const _reservedTypeIds = 32768;
 
 class _Api {
   const _Api();

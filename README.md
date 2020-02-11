@@ -14,7 +14,69 @@ To actually serialize and deserialize objects, just call `binary.serialize(…)`
 
 * Can encode any class, including generic classes. Classes need to be registered before though.
 * Serialization is safe. No single adapter can corrupt the binary format. Misbehaving adapters will be called out during runtime, making the serialization process easily debuggable.
-* Future- and backwards-compatible. Unknown types will just be decoded to null.
+* Future- and backwards-compatible. Unknown types will just be decoded to `null`.
+
+### I'm writing a custom `TypeAdapter`. Any guidance?
+
+You should (almost certainly) be extending `TypeAdapter`, not `UnsafeTypeAdapter`.  
+If you extend `UnsafeTypeAdapter`, the adapter should be finalized (as in future and backwards compatible and no bugs) – otherwise whole blocks of data could get corrupted. Also, you can never delete the type anymore.
+
+If you created an adapter that can encode any subclass of a class (which either means, it's a class with a private constructor that no one can extend directly or you know all subclasses), you may register it with `TypeRegistry.registerAdapter(id, adapter, suppressWarningsForSubtype: true)` to ensure that no warning is shown to the developer in debug mode.
+
+If you're writing an adapter for a package (library):
+
+- If you're using code generation to create the adapter, make sure to include the generated file in the package.
+- You should give your adapter a negative type id to not interfere with the adapters created by the end-user. File a PR for reserving a type id in the [table of reserved type ids](table_of_type_ids.md).
+
+### Behind the scenes: Searching for the right adapter
+
+Adapters are stored in a tree, like the following:
+
+```
+root node for objects to serialize
+├─ virtual node for Iterable<Object>
+│  ├─ AdapterForRunes
+│  │  └─ AdapterForNull
+│  ├─ AdapterForList<Object>
+│  │  ├─ AdapterForListOfBool
+│  │  │  └─ AdapterForListOfNull
+│  │  ├─ AdapterForListOfInt
+│  │  │  └─ AdapterForUint8List
+│  │  ├─ AdapterForPrimitiveList<double>
+│  │  └─ AdapterForPrimitiveList<String>
+│  └─ AdapterForSet<Object>
+│     ├─ AdapterForSetOfInt
+│     │  └─ AdapterForPrimitiveSet<Null>
+│     ├─ AdapterForSet<bool>
+│     │  └─ AdapterForPrimitiveSet<Null>
+│     ├─ AdapterForPrimitiveSet<double>
+│     └─ AdapterForPrimitiveSet<String>
+├─ virtual node for int
+│  ├─ AdapterForUint8
+│  ├─ AdapterForInt8
+│  ├─ AdapterForUint16
+│  ├─ AdapterForInt16
+│  ├─ AdapterForUint32
+│  ├─ AdapterForInt32
+│  └─ AdapterForInt64
+├─ virtual node for bool
+│  ├─ AdapterForTrueBool
+│  └─ AdapterForFalseBool
+├─ virtual node for String
+│  ├─ AdapterForStringWithoutNullByte
+│  └─ AdapterForArbitraryString
+├─ AdapterForDouble
+├─ AdapterForBigInt
+├─ AdapterForDateTime
+├─ AdapterForDuration
+├─ AdapterForRegExp
+├─ AdapterForStackTrace
+├─ AdapterForMapEntry<Object, Object>
+└─ AdapterForMap<Object, Object>
+   ├─ AdapterForMapWithPrimitiveKey<double, Object>
+   ├─ AdapterForMapWithPrimitiveKey<int, Object>
+   └─ AdapterForMapWithPrimitiveKey<String, Object>
+```
 
 ### Behind the scenes: How is data encoded
 
@@ -68,26 +130,26 @@ class AdapterForMyClass<T> extends TypeAdapter<MyClass<T>> {
 AdapterForMyClass().registerForId(0);
 ```
 
-The encoded form of `MyClass(id: 'hey', numbers: [1,2])` would look like this:
+The encoded form of `MyClass(id: 'foo', numbers: [1,2])` would look like this:
 
 (All ids are offsetted)
 
 ```
- 8  0 .............. id of AdapterForMyClass
- 0  2 ..............   number of fields
- 0  0 ..............   field #0
- 7 f9 ..............     id of AdapterForString
- 0  0 0 3 ..........       length of String
-68 .................       h
-65 .................       e
-79 .................       y
- 0  1 ..............   field #1
- 7 e7 ..............     id of AdapterForSet<int>
- 7 eb ..............       id of AdapterForPrimitiveList<int>
- 0  0 0 2 ..........         length of List
-3f f0 0 0 0 0 0 0 ..           1
-40  0 0 0 0 0 0 0 ..           2
+128   0 ............. id of AdapterForMyClass
+  0   0   0  23 ..... number of bytes written by adapter
+  0   0 .............   field #0
+127 228 .............     id of AdapterForNullTerminatedString
+102 .................       f
+111 .................       o
+111 .................       o
+  0 .................       \0
+  0   1 .............   field #1
+127 241 .............     id of AdapterForListOfInt
+ 88   6 .............       data of AdapterForListOfBool containing
+                            [true, true, false] (whether elements are non-null)
+  1 .................         1
+  2 .................         2
 
 Encoded:
-8 0 0 2 0 0 7 f9 0 0 0 3 68 65 79 0 1 7 e7 7 eb 0 0 0 2 3f f0 0 0 0 0 0 0 40 0 0 0 0 0 0 0
+80 0 0 0 0 17 0 0 7f e4 66 6f 6f 0 0 1 7f f1 58 6 1 2 0 2 7f f6 5d 99 40
 ```

@@ -1,6 +1,6 @@
 part of 'binary.dart';
 
-/// [TypeAdapter]s use the [BinaryWriter] when serializing data.
+/// [AdapterFor]s use the [BinaryWriter] when serializing data.
 class BinaryWriter {
   /// We make use of the [_ResizingByteData] defined below to get a [ByteData]
   /// where we don't have to care about increasing the length anymore.
@@ -42,7 +42,7 @@ class BinaryWriter {
 
     writeUint16(typeId + _reservedTypeIds);
 
-    if (adapter is UnsafeTypeAdapter) {
+    if (adapter.isPrimitive) {
       adapter.write(this, value);
     } else {
       _reserve(4); // Reserve bytes for the length.

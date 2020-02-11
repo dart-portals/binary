@@ -1,61 +1,113 @@
+import 'package:meta/meta.dart';
+
 import 'type_registry.dart';
 
-/// Adapters are saved in a tree of [TypeNode]s for efficient lookup.
+/// Adapters are saved in a tree of [AdapterNode]s for efficient lookup.
 ///
-/// ## Why can't we resolve adapters statically by type?
+/// A tree structure allows us to have different adapters based on the type and
+/// the value. In contrast to resolving adapters statically by type, this
+/// allows more flexibility when choosing the adapter:
+/// - An adapter might be able to encode a `SampleClass` and all its
+///   subclasses, so there don't need to be adapters for the subclasses.
+/// - An adapter might decide to encode different *values* differently. For
+///   example, integers that match the constraints of uint8, int 8, uint16, etc
+///   all might be encoded differently.
+/// - Some types cannot be known statically. For example, `<int>[].runtimeType`
+///   is not the same `List<int>` as a static `List<int>`. At runtime, it's
+///   either a `List<int>` or a `JSArray`.
 ///
-/// Most of the time when using adapters, we don't need to look at this tree at
-/// all – rather we can directly look up the adapter in a
-/// `Map<Type, TypeAdapter<dynamic>>`.
-/// Sometimes however, that doesn't work. The reason is that in Dart, the
-/// static and runtime type can differ – consider the following example:
-///
-/// ```
-/// Type typeOf<T>() => T;
-/// print(<int>[1,2,3].runtimeType == typeOf<List<int>>()); // false
-/// ```
-///
-/// Although both `<int>[1,2,3].runtimeType` and `typeOf<List<int>>()` evaluate
-/// to `List<int>` when printed as a String, these are different `List<int>`s.
-/// The reason for that is underlying optimizations. For example, on the web,
-/// `<int>[1,2,3].runtimeType` evaluates to `JSArray` – you can try that on
-/// [DartPad](https://dartpad.dev).
-class TypeNode<T> {
-  TypeNode(this.adapter);
-  TypeNode.virtual() : this(null);
+/// That being said, there exist shortcuts into the tree based on the runtime
+/// type.
+class AdapterNode<T> {
+  AdapterNode({
+    @required this.adapter,
+    this.showWarningForSubtypes = true,
+  }) : assert(showWarningForSubtypes != null);
 
-  final TypeAdapter<T> adapter;
-  final _subtypes = <TypeNode<T>>{};
+  AdapterNode.virtual() : this(adapter: null);
+
+  /// The adapter registered for this type node.
+  final AdapterFor<T> adapter;
+  bool get isVirtual => adapter == null;
+
+  /// Whether to show warnings for subtypes. If [true] and values do not match
+  /// this [AdapterNode] exactly, a warning will be outputted to the console.
+  /// For example, if the developer tries to encode a `SomeType<int>`, but the
+  /// only [AdapterNode] found is one of `SomeType<dynamic>`, a warning will be
+  /// logged in the console if [showWarningForSubtypes] is [true].
+  final bool showWarningForSubtypes;
+
+  /// [AdapterNode]s of subtypes.
+  final _children = <AdapterNode<T>>{};
 
   Type get type => T;
 
-  bool matches(dynamic value) => value is T;
-  bool isSupertypeOf(TypeNode<dynamic> type) => type is TypeNode<T>;
+  bool matches(dynamic value) {
+    if (value is! T) {
+      return false;
+    }
+    if (adapter is AdapterForSpecificValueOfType) {
+      return (adapter as AdapterForSpecificValueOfType).matches(value);
+    }
+    return true;
+  }
 
-  void addSubtype(TypeNode<T> type) => _subtypes.add(type);
-  void addSubtypes(Iterable<TypeNode<dynamic>> types) =>
-      _subtypes.addAll(types.cast<TypeNode<T>>());
+  bool isSupertypeOf(AdapterNode<dynamic> node) {
+    final isValueNode =
+        adapter != null && adapter is AdapterForSpecificValueOfType;
+    return !isValueNode && node is AdapterNode<T>;
+  }
 
-  void insert(TypeNode<T> newType) {
-    final typesOverNewType =
-        _subtypes.where((type) => type.isSupertypeOf(newType));
+  void addNode(AdapterNode<T> type) => _children.add(type);
+  void addSubNodes(Iterable<AdapterNode<dynamic>> types) =>
+      _children.addAll(types.cast<AdapterNode<T>>());
 
-    if (typesOverNewType.isNotEmpty) {
-      for (final subtype in typesOverNewType) {
-        subtype.insert(newType);
+  void insert(AdapterNode<T> newNode) {
+    final parentNodes = _children.where((type) => type.isSupertypeOf(newNode));
+
+    if (parentNodes.isNotEmpty) {
+      for (final subtype in parentNodes) {
+        subtype.insert(newNode);
       }
     } else {
-      final typesUnderNewType =
-          _subtypes.where((type) => newType.isSupertypeOf(type)).toList();
-      _subtypes.removeAll(typesUnderNewType);
-      newType.addSubtypes(typesUnderNewType);
-      _subtypes.add(newType);
+      final typesUnderNewType = _children.where(newNode.isSupertypeOf).toList();
+      _children.removeAll(typesUnderNewType);
+      newNode.addSubNodes(typesUnderNewType);
+      _children.add(newNode);
     }
   }
 
-  TypeNode<T> findNodeByValue(T value) {
-    final matchingSubtype =
-        _subtypes.firstWhere((type) => type.matches(value), orElse: () => null);
-    return matchingSubtype?.findNodeByValue(value) ?? this;
+  AdapterNode<T> findNodeByValue(T value) {
+    final matchingSubNode = _children.firstWhere(
+      (type) => type.matches(value),
+      orElse: () => null,
+    );
+    return matchingSubNode?.findNodeByValue(value) ?? this;
+  }
+
+  void debugDump() {
+    final buffer = StringBuffer();
+    buffer.write('root node for objects to serialize\n');
+    final children = _children;
+
+    for (final child in children) {
+      buffer.write(child._debugToString('', child == children.last));
+    }
+    print(buffer);
+  }
+
+  String _debugToString(String prefix, bool isLast) {
+    final children = _children.toList();
+    return [
+      prefix,
+      if (isVirtual)
+        '${isLast ? '└─' : '├─'} virtual node for $type'
+      else
+        '${isLast ? '└─' : '├─'} ${adapter.runtimeType}',
+      '\n',
+      for (final child in children)
+        child._debugToString(
+            '$prefix${isLast ? '   ' : '│  '}', child == children.last),
+    ].join();
   }
 }

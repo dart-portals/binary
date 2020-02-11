@@ -22,7 +22,7 @@ class MyClass<T> {
   String toString() => 'MyClass($id, $someNumbers, $booleans)';
 }
 
-class AdapterForMyClass<T> extends TypeAdapter<MyClass<T>> {
+class AdapterForMyClass<T> extends AdapterFor<MyClass<T>> {
   const AdapterForMyClass();
 
   @override
@@ -58,7 +58,7 @@ void main() {
     });
 
   final data = binary.serialize(MyClass(
-    id: 'hey',
+    id: 'foo',
     someNumbers: {1, 2, null},
     booleans: [true, true, null, true, false, true, false, true, true],
   ));

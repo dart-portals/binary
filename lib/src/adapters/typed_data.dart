@@ -2,7 +2,7 @@ part of 'adapters.dart';
 
 // Adapters for types of the dart:typed_data library.
 
-class AdapterForUint8List extends TypeAdapter<Uint8List> {
+class AdapterForUint8List extends AdapterFor<Uint8List> {
   const AdapterForUint8List();
 
   @override

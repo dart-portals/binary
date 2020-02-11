@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 
 import 'package:meta/meta.dart';
@@ -7,7 +6,7 @@ import 'adapters/adapters.dart';
 import 'binary.dart';
 import 'type_node.dart';
 
-part 'type_adapter.dart';
+part 'adapter.dart';
 
 void debugPrint(Object object) => print(object);
 
@@ -15,23 +14,24 @@ class LegacyTypeUsed implements Exception {
   LegacyTypeUsed(this.id, this.adapter);
 
   final int id;
-  final TypeAdapter<dynamic> adapter;
+  final AdapterFor<dynamic> adapter;
 
   String toString() => 'The id $id is marked as legacy and should not be used '
       'anymore. However, the adapter $adapter registered for that id.';
 }
 
-/// The [TypeRegistry] holds references to all [TypeAdapter]s used to serialize
+/// The [TypeRegistry] holds references to all [AdapterFor]s used to serialize
 /// and deserialize data.
 ///
 /// It allows getting an adapter by id, getting the id of an adapter, as well
 /// as finding an adapter for a specific object.
-final TypeRegistry = _TypeRegistryImpl._()..registerAdapters(builtInAdapters);
+final TypeRegistry = TypeRegistryImpl._();
 
-class _TypeRegistryImpl {
-  _TypeRegistryImpl._();
-
-  void thenDo(void Function() callback) => scheduleMicrotask(callback);
+class TypeRegistryImpl {
+  TypeRegistryImpl._() {
+    registerBuiltInAdapters(this);
+    _adapterTree.debugDump();
+  }
 
   // For greater efficiency, there are several data structures that hold
   // references to adapters. These allow us to:
@@ -42,27 +42,42 @@ class _TypeRegistryImpl {
   // - If the static type of an object differs from its runtime type, getting
   //   the correct adapter somewhere between O(log n) and O(n), depending on
   //   the class hierarchy.
-  final _idsByAdapters = <TypeAdapter<dynamic>, int>{};
-  final _adaptersById = <int, TypeAdapter<dynamic>>{};
-  final _adaptersByExactType = <Type, TypeAdapter<dynamic>>{};
-  final _typeTree = TypeNode<Object>.virtual()
-    ..addSubtype(TypeNode<Iterable>.virtual());
+  final _idsByAdapters = <AdapterFor<dynamic>, int>{};
+  final _adaptersById = <int, AdapterFor<dynamic>>{};
 
-  // Users may register adapters for types in one version of their app and
-  // later remove types and the corresponding adapters. To ensure
-  // interoperability between encodings created at different versions of the
-  // app, ids should not be reused at some later time.
+  final _adapterShortcuts = <Type, AdapterNode<dynamic>>{};
+  final _adapterTree = AdapterNode<Object>.virtual();
+
+  /// Users may register adapters for types in one version of their app and
+  /// later remove types and the corresponding adapters. To ensure
+  /// interoperability between encodings created at different versions of the
+  /// app, ids should not be reused at some later time.
   final _legacyIds = <int>{};
 
-  // If an exact type can't be encoded, we suggest adding an adapter. Here, we
-  // keep track of which adapters we suggested along with the suggested id.
+  /// If an exact type can't be encoded, we suggest adding an adapter. Here, we
+  /// keep track of which adapters we suggested along with the suggested id.
   final _suggestedAdapters = <String, int>{};
 
-  /// Register a [TypeAdapter] to make it available for serializing and
+  /// Register a virtual [AdapterNode] to make it available for serializing and
   /// deserializing.
-  void registerAdapter<T>(int typeId, TypeAdapter<T> adapter) {
+  void registerVirtualNode<T>(AdapterNode<T> node) {
+    assert(node != null);
+    assert(node.isVirtual);
+
+    _adapterShortcuts[node.type] ??= node;
+    _adapterTree.insert(node);
+  }
+
+  /// Register a [AdapterFor<T>] to make it available for serializing and
+  /// deserializing.
+  void registerAdapter<T>(
+    int typeId,
+    AdapterFor<T> adapter, {
+    bool showWarningForSubtypes = true,
+  }) {
     assert(typeId != null);
     assert(adapter != null);
+    assert(showWarningForSubtypes != null);
 
     if (_legacyIds.contains(typeId)) {
       throw LegacyTypeUsed(typeId, adapter);
@@ -74,13 +89,6 @@ class _TypeRegistryImpl {
       return;
     }
 
-    final adapterForType = _adaptersByExactType[adapter.type];
-    if (adapterForType != null && adapterForType != adapter) {
-      debugPrint('You tried to register adapter $adapter for type '
-          '${adapter.type}, but for that type there is already adapter '
-          '$adapterForType registered.');
-    }
-
     final adapterForId = _adaptersById[typeId];
     if (adapterForId != null && adapterForId != adapter) {
       debugPrint('You tried to register $adapter under id $typeId, but there '
@@ -90,17 +98,27 @@ class _TypeRegistryImpl {
 
     _idsByAdapters[adapter] = typeId;
     _adaptersById[typeId] = adapter;
-    _adaptersByExactType[adapter.type] = adapter;
-    _typeTree.insert(TypeNode<T>(adapter));
+
+    final node = AdapterNode<T>(
+      adapter: adapter,
+      showWarningForSubtypes: showWarningForSubtypes,
+    );
+
+    _adapterShortcuts[adapter.type] ??= node;
+    _adapterTree.insert(node);
   }
 
   /// Register multiple adapters.
-  void registerAdapters(Map<int, TypeAdapter<dynamic>> adaptersById) {
+  void registerAdapters(
+    Map<int, AdapterFor<dynamic>> adaptersById, {
+    bool showWarningForSubtypes = true,
+  }) {
     // We don't directly call [registerAdapter], but rather let the adapter
     // call that method, because otherwise we would lose type information (the
     // static type of the adapters inside the map is `TypeAdapter<dynamic>`).
     adaptersById.forEach((typeId, adapter) {
-      adapter._registerForId(typeId, this);
+      adapter._registerForId(typeId, this,
+          showWarningForSubtypes: showWarningForSubtypes);
     });
   }
 
@@ -115,21 +133,17 @@ class _TypeRegistryImpl {
   }
 
   /// Finds the id of an adapter.
-  int findIdOfAdapter(TypeAdapter<dynamic> adapter) => _idsByAdapters[adapter];
+  int findIdOfAdapter(AdapterFor<dynamic> adapter) => _idsByAdapters[adapter];
 
   /// Finds the adapter registered for the given [typeId].
-  TypeAdapter findAdapterById(int typeId) => _adaptersById[typeId];
+  AdapterFor<dynamic> findAdapterById(int typeId) => _adaptersById[typeId];
 
   /// Finds an adapter for serializing the [object].
-  TypeAdapter findAdapterByValue<T>(T object) {
-    // First, try to find an adapter by the exact type in O(1).
-    final adapterForExactType = _adaptersByExactType[object.runtimeType];
-    if (adapterForExactType != null) {
-      return adapterForExactType;
-    }
-
-    // Otherwise, find the best matching adapter in the type tree.
-    final matchingNode = _typeTree.findNodeByValue(object);
+  AdapterFor<T> findAdapterByValue<T>(T object) {
+    // Find the best matching adapter in the type tree.
+    final searchStartNode =
+        _adapterShortcuts[object.runtimeType] ?? _adapterTree;
+    final matchingNode = searchStartNode.findNodeByValue(object);
     final matchingType = matchingNode.type;
     final actualType = object.runtimeType;
 
@@ -139,7 +153,8 @@ class _TypeRegistryImpl {
           '${_createAdapterSuggestion(actualType)}.');
     }
 
-    if (!_isSameType(actualType, matchingType)) {
+    if (matchingNode.showWarningForSubtypes &&
+        !_isSameType(actualType, matchingType)) {
       debugPrint('No adapter for the exact type $actualType found, so we\'re '
           'encoding it as a $matchingNode. For better performance and truly '
           'type-safe serializing, consider adding an adapter for that type by '

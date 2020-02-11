@@ -1,12 +1,12 @@
 part of 'binary.dart';
 
-/// [TypeAdapter]s use the [BinaryReader] when deserializing data.
+/// [AdapterFor]s use the [BinaryReader] when deserializing data.
 class BinaryReader {
   BinaryReader(List<int> data) : _limitingData = _LimitingByteData(data) {
     _addLimit(_data.lengthInBytes);
   }
 
-  final _limitingData;
+  final _LimitingByteData _limitingData;
   ByteData get _data => _limitingData._data;
   int _reserve(int bytes, int limit) => _limitingData._reserve(bytes, limit);
 
@@ -30,13 +30,18 @@ class BinaryReader {
     final adapter = TypeRegistry.findAdapterById(typeId);
 
     if (adapter == null) {
+      // This is an unknown type id. Just assume it's not an [UnsafeTypeAdapter]
+      // (because they should not be deleted) and skip the number of bytes that
+      // it encoded.
       final length = readUint32();
       skip(length);
       return null;
-    } else if (adapter is UnsafeTypeAdapter) {
+    } else if (adapter.isPrimitive) {
+      // Trust the adapter to read exactly the right amount of bytes.
       final data = adapter.read(this);
       return data;
     } else {
+      // Make sure the adapter doesn't read more or less bytes than promised.
       final length = readUint32();
       _addLimit(length);
       final data = adapter.read(this);
