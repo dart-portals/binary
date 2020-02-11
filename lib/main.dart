@@ -7,7 +7,7 @@ class MyClass<T> {
   MyClass({
     @required this.id,
     @required this.someNumbers,
-    @required this.booleans,
+    @required this.someOther,
   });
 
   @BinaryField(0)
@@ -17,9 +17,9 @@ class MyClass<T> {
   final Set<T> someNumbers;
 
   @BinaryField(2)
-  final List<bool> booleans;
+  final Map<int, bool> someOther;
 
-  String toString() => 'MyClass($id, $someNumbers, $booleans)';
+  String toString() => 'MyClass($id, $someNumbers, $someOther)';
 }
 
 class AdapterForMyClass<T> extends AdapterFor<MyClass<T>> {
@@ -33,7 +33,7 @@ class AdapterForMyClass<T> extends AdapterFor<MyClass<T>> {
       ..writeFieldId(1)
       ..write(obj.someNumbers)
       ..writeFieldId(2)
-      ..write(obj.booleans);
+      ..write(obj.someOther);
   }
 
   @override
@@ -45,7 +45,7 @@ class AdapterForMyClass<T> extends AdapterFor<MyClass<T>> {
     return MyClass<T>(
       id: fields[0],
       someNumbers: fields[1],
-      booleans: fields[2],
+      someOther: fields[2],
     );
   }
 }
@@ -60,7 +60,7 @@ void main() {
   final data = binary.serialize(MyClass(
     id: 'foo',
     someNumbers: {1, 2, null},
-    booleans: [true, true, null, true, false, true, false, true, true],
+    someOther: {1: true, 2: true, 3: null, 4: true, 5: false, 6: true, 7: true},
   ));
   print('Serialized to $data');
   print(binary.deserialize(data));
