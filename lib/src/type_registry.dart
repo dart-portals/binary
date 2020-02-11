@@ -156,9 +156,9 @@ class TypeRegistryImpl {
     if (matchingNode.showWarningForSubtypes &&
         !_isSameType(actualType, matchingType)) {
       debugPrint('No adapter for the exact type $actualType found, so we\'re '
-          'encoding it as a $matchingNode. For better performance and truly '
-          'type-safe serializing, consider adding an adapter for that type by '
-          'calling ${_createAdapterSuggestion(actualType)}.');
+          'encoding it as a ${matchingNode.type}. For better performance and '
+          'truly type-safe serializing, consider adding an adapter for that '
+          'type by calling ${_createAdapterSuggestion(actualType)}.');
     }
 
     return matchingNode.adapter;
@@ -169,7 +169,8 @@ class TypeRegistryImpl {
         runtimeType
             .toString()
             .replaceAll('JSArray', 'List')
-            .replaceAll('_CompactLinkedHashSet', 'Set');
+            .replaceAll('_CompactLinkedHashSet', 'Set')
+            .replaceAll('_InternalLinkedHashMap', 'Map');
   }
 
   String _createAdapterSuggestion(Type type) {
