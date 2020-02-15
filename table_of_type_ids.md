@@ -1,22 +1,20 @@
 # Table of reserved type ids
 
+> Consider adding something like the following to your package to allow users to call `binary.initializeMyPackage()`:
+>
+> ```dart
+> extension MyPackageBinary on BinaryApi {
+>   void initializeMyPackage() {
+>     TypeRegistry.registerAdapters({
+>       ...
+>     });
+>   }
+> }
+> ```
+
 Type id reservations are done in batches of 10. The x stands for any digit.
 
-If you are creating a Dart that needs to register custom type adapters and that's intended to be published on [pub.dev](https://pub.dev), don't hesitate to file a pull request adding it to this table.
-
-Consider containing something like the following in your package:
-
-```dart
-extension MyPackageBinary on BinaryApi {
-  void initializeMyPackage() {
-    TypeRegistry.registerAdapters({
-      ...
-    });
-  }
-}
-```
-
-Users can then call `binary.initializeMyPackage()`.
+If you are creating a Dart package that needs to register custom type adapters and that's intended to be published on [pub.dev](https://pub.dev), don't hesitate to file a pull request adding type ids to this table.
 
 | type ids | reserved for      |
 | -------- | ----------------- |
