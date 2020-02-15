@@ -14,5 +14,5 @@ class _Api {
 
   Uint8List serialize(dynamic object) =>
       (BinaryWriter()..write(object))._dataAsUint8List;
-  T deserialize<T>(Uint8List data) => BinaryReader(data).read<T>();
+  T deserialize<T>(List<int> data) => BinaryReader(data).read<T>();
 }
