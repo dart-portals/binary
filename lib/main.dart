@@ -1,25 +1,23 @@
-import 'package:meta/meta.dart';
-
 import 'binary.dart';
 
-@BinaryType(legacyFields: {2})
+@BinaryType(legacyFields: {3})
 class MyClass<T> {
   MyClass({
-    @required this.id,
-    @required this.someNumbers,
-    @required this.someOther,
+    this.someItems,
+    this.someMappedInts,
+    this.pointer,
   });
 
   @BinaryField(0)
-  final String id;
+  final Set<T> someItems;
 
   @BinaryField(1)
-  final Set<T> someNumbers;
+  final Map<int, bool> someMappedInts;
 
   @BinaryField(2)
-  final Map<int, bool> someOther;
+  final MyClass<String> pointer;
 
-  String toString() => 'MyClass($id, $someNumbers, $someOther)';
+  String toString() => 'MyClass($someItems, $someMappedInts, $pointer)';
 }
 
 class AdapterForMyClass<T> extends AdapterFor<MyClass<T>> {
@@ -29,11 +27,11 @@ class AdapterForMyClass<T> extends AdapterFor<MyClass<T>> {
   void write(BinaryWriter writer, MyClass<T> obj) {
     writer
       ..writeFieldId(0)
-      ..write(obj.id)
+      ..write(obj.someItems)
       ..writeFieldId(1)
-      ..write(obj.someNumbers)
+      ..write(obj.someMappedInts)
       ..writeFieldId(2)
-      ..write(obj.someOther);
+      ..write(obj.pointer);
   }
 
   @override
@@ -43,9 +41,9 @@ class AdapterForMyClass<T> extends AdapterFor<MyClass<T>> {
     };
 
     return MyClass<T>(
-      id: fields[0],
-      someNumbers: fields[1],
-      someOther: fields[2],
+      someItems: fields[0],
+      someMappedInts: fields[1],
+      pointer: fields[2],
     );
   }
 }
@@ -55,14 +53,15 @@ void main() {
     ..registerLegacyTypes({1})
     ..registerAdapters({
       0: AdapterForMyClass<int>(),
+      2: AdapterForMyClass<String>(),
     });
 
   final data = binary.serialize(MyClass(
-    id: 'foo',
-    someNumbers: {1, 2, null},
-    someOther: {1: true, 2: true, 3: null, 4: true, 5: false, 6: true, 7: true},
+    someItems: {1, null, 2},
+    pointer: MyClass(
+      someMappedInts: {1: true, 2: true, 3: null, 4: true, 5: false, 6: true},
+    ),
   ));
   print('Serialized to $data');
   print(binary.deserialize(data));
-  print(data.map((byte) => byte.toRadixString(16)).join(' '));
 }
