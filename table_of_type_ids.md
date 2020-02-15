@@ -1,5 +1,7 @@
 # Table of reserved type ids
 
+If you are creating a Dart package that needs to register custom type adapters and that's intended to be published on [pub.dev](https://pub.dev), don't hesitate to file a pull request adding type ids to this table.
+
 > Consider adding something like the following to your package to allow users to call `binary.initializeMyPackage()`:
 >
 > ```dart
@@ -13,8 +15,6 @@
 > ```
 
 Type id reservations are done in batches of 10. The x stands for any digit.
-
-If you are creating a Dart package that needs to register custom type adapters and that's intended to be published on [pub.dev](https://pub.dev), don't hesitate to file a pull request adding type ids to this table.
 
 | type ids | reserved for      |
 | -------- | ----------------- |
