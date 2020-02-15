@@ -32,7 +32,7 @@ void registerBuiltInAdapters(TypeRegistryImpl registry) {
 
 void _registerCoreAdapters(TypeRegistryImpl registry) {
   // null adapter
-  registry.registerAdapter(-25, AdapterForNull());
+  registry.registerAdapter(-101, AdapterForNull());
 
   // int adapters
   registry.registerVirtualNode(AdapterNode<int>.virtual());
