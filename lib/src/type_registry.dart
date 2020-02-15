@@ -17,7 +17,7 @@ class LegacyTypeUsed implements Exception {
   final AdapterFor<dynamic> adapter;
 
   String toString() => 'The id $id is marked as legacy and should not be used '
-      'anymore. However, the adapter $adapter registered for that id.';
+      'anymore. However, the adapter $adapter got registered for that id.';
 }
 
 /// The [TypeRegistry] holds references to all [AdapterFor]s used to serialize
