@@ -95,6 +95,8 @@ root node for objects to serialize
 └─ ...
 ```
 
+You can always get such a tree visualization of the adapter tree by calling `TypeRegistry.debugDumpTree()`.
+
 Additionally, the `TypeRegistry` contains a map of shortcuts from types to nodes in the tree.
 
 ### Behind the scenes: How is data encoded

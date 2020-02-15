@@ -30,7 +30,6 @@ final TypeRegistry = TypeRegistryImpl._();
 class TypeRegistryImpl {
   TypeRegistryImpl._() {
     registerBuiltInAdapters(this);
-    _adapterTree.debugDump();
   }
 
   // For greater efficiency, there are several data structures that hold
@@ -180,4 +179,6 @@ class TypeRegistryImpl {
 
     return 'AdapterFor$type().registerForId($suggestedId)';
   }
+
+  void debugDumpTree() => _adapterTree.debugDump();
 }
