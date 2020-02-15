@@ -26,12 +26,13 @@ class BinaryReader {
 
   /// Finds a fitting adapter for the given [value] and then writes it.
   T read<T>() {
-    final typeId = readUint16() - _reservedTypeIds;
+    final offsettedTypeId = readUint16();
+    final typeId = offsettedTypeId - _reservedTypeIds;
     final adapter = TypeRegistry.findAdapterById(typeId);
 
     if (adapter == null) {
-      // This is an unknown type id. Just assume it's not an [UnsafeTypeAdapter]
-      // (because they should not be deleted) and skip the number of bytes that
+      // This is an unknown type id. Just assume it's not a primitive adapter
+      // (because they cannot be deleted) and skip the number of bytes that
       // it encoded.
       final length = readUint32();
       skip(length);
