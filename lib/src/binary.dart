@@ -5,12 +5,12 @@ import 'type_registry.dart';
 part 'binary_reader.dart';
 part 'binary_writer.dart';
 
-const binary = _Api();
+const binary = BinaryApi();
 
 const _reservedTypeIds = 32768;
 
-class _Api {
-  const _Api();
+class BinaryApi {
+  const BinaryApi();
 
   Uint8List serialize(dynamic object) =>
       (BinaryWriter()..write(object))._dataAsUint8List;
