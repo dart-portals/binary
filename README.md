@@ -159,10 +159,6 @@ If we call `binary.serialize(sample)`, we get `[128, 0, 0, 0, 0, 46, 0, 0, 127, 
 Here's what these bytes mean:
 
 ```
-│  └─ AdapterForArbitraryString
-├─ AdapterForDouble
-└─ ...
-
 .................. data
 128   0 .......... ├─ id of AdapterForMyClass<int>()
   0   0   0  46 .. ├─ number of bytes written by adapter
