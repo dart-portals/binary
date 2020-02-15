@@ -2,19 +2,33 @@
 
 Type id reservations are done in batches of 10. The x stands for any digit.
 
-If you create a public Dart package hosted on [pub.dev](https://pub.dev) that needs to register custom type adapters, don't hesitate to file a pull request adding it to this table.
+If you are creating a Dart that needs to register custom type adapters and that's intended to be published on [pub.dev](https://pub.dev), don't hesitate to file a pull request adding it to this table.
 
-| type ids | reserved for                      |
-| -------- | --------------------------------- |
-| -1 – -9  | primitive `dart:core` types       |
-| -1x      | primitive `dart:core` types       |
-| -2x      | primitive `dart:core` types       |
-| -3x      | primitive `dart:core` types       |
-| -4x      | primitive `dart:core` types       |
-| -5x      | primitive `dart:core` types       |
-| -6x      | primitive `dart:core` types       |
-| -7x      | primitive `dart:core` types       |
-| -8x      | primitive `dart:core` types       |
-| -9x      | primitive `dart:core` types       |
-| -10x     | primitive `dart:core` types       |
-| -11x     | primitive `dart:typed_data` types |
+Consider containing something like the following in your package:
+
+```dart
+extension MyPackageBinary on BinaryApi {
+  void initializeMyPackage() {
+    TypeRegistry.registerAdapters({
+      ...
+    });
+  }
+}
+```
+
+Users can then call `binary.initializeMyPackage()`.
+
+| type ids | reserved for      |
+| -------- | ----------------- |
+| -1 – -9  | `dart:core`       |
+| -1x      | `dart:core`       |
+| -2x      | `dart:core`       |
+| -3x      | `dart:core`       |
+| -4x      | `dart:core`       |
+| -5x      | `dart:core`       |
+| -6x      | `dart:core`       |
+| -7x      | `dart:core`       |
+| -8x      | `dart:core`       |
+| -9x      | `dart:core`       |
+| -10x     | `dart:core`       |
+| -11x     | `dart:typed_data` |
