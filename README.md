@@ -99,9 +99,9 @@ Additionally, the `TypeRegistry` contains a map of shortcuts from types to nodes
 
 ### Behind the scenes: How is data encoded
 
-When encoding a value with a fitting adapter, two steps happen:
+When encoding a value with a fitting adapter, three steps happen:
 
-* The id that the adapter was registered with gets encoded.
+* The id that the adapter was registered for gets encoded.
 * The adapter is used to encode the value.
 * For non-primitive adapters, the length of the encoding is saved.
 
@@ -159,33 +159,50 @@ If we call `binary.serialize(sample)`, we get `[128, 0, 0, 0, 0, 46, 0, 0, 127, 
 Here's what these bytes mean:
 
 ```
-128   0 .............. id of AdapterForMyClass<int>()
-  0   0   0  46 ...... number of bytes written by adapter
-  0   0 ..............   field #0: someItems
-127 196 ..............     id of AdapterForSet<int>()
-127 226 ..............       id of AdapterForPrimitiveList.nullable(AdapterForUint8())
-100 ..................         List<bool> of which elements are non-null: [true, false, true]
-  1 ..................           list item: 1
-  2 ..................           list item: 2
-  0   1 ..............   field #1: someMappedInts
-127 231 ..............     id of AdapterForNull()
-  0   2 ..............   field #2: pointer
-128   2 ..............     id of AdapterForMyClass<String>()
-  0   0   0  25 ......     number of bytes written by adapter
-  0   0 ..............       field #0: someItems
-127 231 ..............         id of AdapterForNull()
-  0   1 ..............       field #1: someMappedInts
-127 170 ..............         id of AdapterForMap<int, bool>()
-127 228 ..............           id of AdapterForPrimitiveList.short(AdapterForUint8())
-  6 ..................             length of list
-  1 ..................             list item: 1
-  2 ..................             list item: 2
-  3 ..................             list item: 3
-  4 ..................             list item: 4
-  5 ..................             list item: 5
-  6 ..................             list item: 6
-127 235 ..............           id of AdapterForListOfBool()
- 93 144 ..............           List<bool> of elements: [true, true, null, true, false, true]
-  0   2 ..............       field #2: pointer
-127 231 ..............         id of AdapterForNull()
+│  └─ AdapterForArbitraryString
+├─ AdapterForDouble
+└─ ...
+
+.................. data
+128   0 .......... ├─ id of AdapterForMyClass<int>()
+  0   0   0  46 .. ├─ number of bytes written by adapter
+.................. └─ actual bytes
+  0   0 ............. ├─ field #0: someItems
+127 196 ............. │  ├─ id of AdapterForSet<int>()
+..................... │  ├─ actual bytes
+127 226 ............. │  │  ├─ id of AdapterForPrimitiveList.nullable(AdapterForUint8())
+..................... │  │  └─ actual bytes
+100 ................. │  │ ... ├─ List<bool> of which elements are non-null:
+..................... │  │ ... │  [true, false, true]
+  1 ................. │  │ ... ├─ list item: 1
+  2 ................. │  │ ... └─ list item: 2
+  0   1 ............. ├─ field #1: someMappedInts
+127 231 ............. │  ├─ id of AdapterForNull()
+..................... │  └─ (no bytes written)
+  0   2 ............. └─ field #2: pointer
+128   2 ................ ├─ id of AdapterForMyClass<String>()
+  0   0   0  25 ........ ├─ number of bytes written by adapter
+........................ └─ actual bytes
+  0   0 ................... ├─ field #0: someItems
+127 231 ................... │  ├─ id of AdapterForNull()
+........................... │  └─ (no bytes written)
+  0   1 ................... ├─ field #1: someMappedInts
+127 170 ................... │  ├─ id of AdapterForMap<int, bool>()
+........................... │  └─ actual bytes
+127 228 ................... │ ... ├─ id of AdapterForPrimitiveList.short(AdapterForUint8())
+........................... │ ... ├─ actual bytes
+  6 ....................... │ ... │  ├─ length of list
+  1 ....................... │ ... │  ├─ list item: 1
+  2 ....................... │ ... │  ├─ list item: 2
+  3 ....................... │ ... │  ├─ list item: 3
+  4 ....................... │ ... │  ├─ list item: 4
+  5 ....................... │ ... │  ├─ list item: 5
+  6 ....................... │ ... │  └─ list item: 6
+127 235 ................... │ ... ├─ id of AdapterForListOfBool()
+........................... │ ... └─ actual bytes
+ 93 144 ................... │ ...... └─ List<bool> of elements:
+........................... │ ......    [true, true, null, true, false, true]
+  0   2 ................... └─ field #2: pointer
+127 231 ...................... ├─ id of AdapterForNull()
+.............................. └─ (no bytes written)
 ```
