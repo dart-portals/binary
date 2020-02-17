@@ -56,16 +56,55 @@ class BinaryWriter {
     }
   }
 
-  void writeUint8(int value) => _data.setUint8(_reserve(1), value);
-  void writeInt8(int value) => _data.setInt8(_reserve(1), value);
-  void writeUint16(int value) => _data.setUint16(_reserve(2), value);
-  void writeInt16(int value) => _data.setInt16(_reserve(2), value);
-  void writeUint32(int value) => _data.setUint32(_reserve(4), value);
-  void writeInt32(int value) => _data.setInt32(_reserve(4), value);
-  void writeUint64(int value) => _data.setUint64(_reserve(8), value);
-  void writeInt64(int value) => _data.setInt64(_reserve(8), value);
-  void writeFloat32(double value) => _data.setFloat32(_reserve(4), value);
-  void writeFloat64(double value) => _data.setFloat64(_reserve(8), value);
+  void writeUint8(int value) {
+    final offset = _reserve(1);
+    _data.setUint8(offset, value);
+  }
+
+  void writeInt8(int value) {
+    final offset = _reserve(1);
+    _data.setInt8(offset, value);
+  }
+
+  void writeUint16(int value) {
+    final offset = _reserve(2);
+    _data.setUint16(offset, value);
+  }
+
+  void writeInt16(int value) {
+    final offset = _reserve(2);
+    _data.setInt16(offset, value);
+  }
+
+  void writeUint32(int value) {
+    final offset = _reserve(4);
+    _data.setUint32(offset, value);
+  }
+
+  void writeInt32(int value) {
+    final offset = _reserve(4);
+    _data.setInt32(offset, value);
+  }
+
+  void writeUint64(int value) {
+    final offset = _reserve(8);
+    _data.setUint64(offset, value);
+  }
+
+  void writeInt64(int value) {
+    final offset = _reserve(8);
+    _data.setInt64(offset, value);
+  }
+
+  void writeFloat32(double value) {
+    final offset = _reserve(4);
+    _data.setFloat32(offset, value);
+  }
+
+  void writeFloat64(double value) {
+    final offset = _reserve(8);
+    _data.setFloat64(offset, value);
+  }
 
   void debugDump() => print(_dataAsUint8List);
 }
